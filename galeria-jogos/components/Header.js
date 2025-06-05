@@ -2,7 +2,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { FaUserCircle } from 'react-icons/fa';
 
 export default function Header({ admin = false }) {
   const [menuAberto, setMenuAberto] = useState(false);
@@ -58,7 +57,6 @@ export default function Header({ admin = false }) {
                   >
                     Página Inicial
                   </Link>
-
                   {!session.user?.contaValidada && (
                     <Link
                       href="/verificacao"
@@ -68,7 +66,13 @@ export default function Header({ admin = false }) {
                       Verificar Conta
                     </Link>
                   )}
-
+                  <Link
+                    href="/perfil"
+                    className="block px-4 py-2 hover:bg-gray-600"
+                    onClick={() => setMenuAberto(false)}
+                  >
+                    Meu Perfil
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="block px-4 py-2 w-full text-left hover:bg-gray-600"

@@ -11,13 +11,15 @@ export default function Cadastro() {
   const [sobrenome, setSobrenome] = useState("");
   const [email] = useState(session?.user?.email || "");
   const [image] = useState(session?.user?.image || "");
+  const [telefone, setTelefone] = useState("");
+  const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!nome || !sobrenome || !email) {
+    if (!nome || !sobrenome || !email || !username) {
       setErro("Todos os campos são obrigatórios!");
       return;
     }
@@ -29,16 +31,28 @@ export default function Cadastro() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ nome, sobrenome, email, image }),
+      body: JSON.stringify({ nome, sobrenome, email, image, telefone, username }),
     });
 
     if (response.ok) {
-      router.push("/verificacao");
+      const verificationResponse = await fetch("/api/sendVerificationCode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (verificationResponse.ok) {
+        router.push("/verificacao");
+      } else {
+        const verificationData = await verificationResponse.json();
+        setErro(verificationData.message || "Erro ao enviar o código de verificação");
+      }
     } else {
       const data = await response.json();
       setErro(data.message || "Erro ao cadastrar");
     }
-
     setLoading(false);
   };
 
@@ -69,6 +83,22 @@ export default function Cadastro() {
           placeholder="Email"
           value={email}
           disabled
+          className="w-full p-3 mb-4 border rounded"
+        />
+
+        <input
+          type="text"
+          placeholder="Telefone"
+          value={telefone}
+          onChange={(e) => setTelefone(e.target.value)}
+          className="w-full p-3 mb-4 border rounded"
+        />
+
+        <input
+          type="text"
+          placeholder="Nome de usuário"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           className="w-full p-3 mb-4 border rounded"
         />
 
