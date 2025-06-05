@@ -1,20 +1,20 @@
-import Image from "next/image";
-import Link from "next/link";
-import { useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import Image from 'next/image';
+import Link from 'next/link';
+import { useState } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 
 export default function Header({ admin = false }) {
   const [menuAberto, setMenuAberto] = useState(false);
   const { data: session } = useSession();
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: "/" });
+    signOut({ callbackUrl: '/' });
   };
 
   return (
     <header
       className={`${
-        admin ? "bg-gray-900" : "bg-black"
+        admin ? 'bg-gray-900' : 'bg-black'
       } text-white px-6 flex items-center h-[100px] fixed top-0 left-0 right-0 z-50 shadow-md`}
     >
       <div className="relative w-full max-w-7xl mx-auto flex justify-between items-center h-full">
@@ -51,11 +51,11 @@ export default function Header({ admin = false }) {
                     Administração
                   </Link>
                   <Link
-                    href="/perfil"
+                    href="/"
                     className="block px-4 py-2 hover:bg-gray-600"
                     onClick={() => setMenuAberto(false)}
                   >
-                    Editar Perfil
+                    Página Inicial
                   </Link>
                   {!session.user?.contaValidada && (
                     <Link
@@ -66,6 +66,13 @@ export default function Header({ admin = false }) {
                       Verificar Conta
                     </Link>
                   )}
+                  <Link
+                    href="/perfil"
+                    className="block px-4 py-2 hover:bg-gray-600"
+                    onClick={() => setMenuAberto(false)}
+                  >
+                    Meu Perfil
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="block px-4 py-2 w-full text-left hover:bg-gray-600"

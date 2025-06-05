@@ -24,6 +24,9 @@ export const authOptions = {
         if (usuario) {
           token.id = usuario._id;
           token.contaValidada = usuario.contaValidada || false;
+          token.sobrenome = usuario.sobrenome || "";
+          token.telefone = usuario.telefone || "";
+          token.username = usuario.username || "";
         } else {
           token.newUser = true;
           token.contaValidada = false;
@@ -37,13 +40,15 @@ export const authOptions = {
     async session({ session, token }) {
       const client = await MongoClient.connect(process.env.MONGODB_URI);
       const db = client.db(process.env.MONGODB_DB);
-
       const usuario = await db.collection("users").findOne({ email: token.email });
 
-      session.user.id = token.id;
-      session.user.name = token.name;
-      session.user.email = token.email;
-      session.user.image = token.image;
+      session.user.id = usuario?._id || token.id;
+      session.user.name = usuario?.nome || token.name;
+      session.user.email = usuario?.email || token.email;
+      session.user.image = usuario?.image || token.image;
+      session.user.sobrenome = usuario?.sobrenome || "";
+      session.user.telefone = usuario?.telefone || "";
+      session.user.username = usuario?.username || "";
       session.user.newUser = token.newUser || false;
       session.user.contaValidada = usuario?.contaValidada || false;
 
