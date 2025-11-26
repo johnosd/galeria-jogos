@@ -3,24 +3,24 @@ import { useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
 import Header from '../components/Header';
 
-export default function Home({ jogosIniciais }) {
+export default function Home({ gruposIniciais }) {
   const [busca, setBusca] = useState('');
-  const jogos = jogosIniciais;
+  const grupos = gruposIniciais;
   const [modalAberto, setModalAberto] = useState(false);
-  const [jogoSelecionado, setJogoSelecionado] = useState(null);
+  const [grupoSelecionado, setGrupoSelecionado] = useState(null);
 
-  const jogosFiltrados = jogos.filter((jogo) =>
-    jogo.nome.toLowerCase().includes(busca.toLowerCase())
+  const gruposFiltrados = grupos.filter((grupo) =>
+    grupo.nome.toLowerCase().includes(busca.toLowerCase())
   );
 
-  function abrirModal(jogo) {
-    setJogoSelecionado(jogo);
+  function abrirModal(grupo) {
+    setGrupoSelecionado(grupo);
     setModalAberto(true);
   }
 
   function fecharModal() {
     setModalAberto(false);
-    setJogoSelecionado(null);
+    setGrupoSelecionado(null);
   }
 
   return (
@@ -30,7 +30,7 @@ export default function Home({ jogosIniciais }) {
       <div className="max-w-md mx-auto mt-[110px] mb-10 px-4">
         <input
           type="text"
-          placeholder="Buscar jogo..."
+          placeholder="Buscar grupo..."
           value={busca}
           autoFocus
           onChange={(e) => setBusca(e.target.value)}
@@ -39,18 +39,18 @@ export default function Home({ jogosIniciais }) {
       </div>
 
       <main className="min-h-screen bg-gray-100 text-gray-900 px-4 py-8">
-        <h1 className="text-3xl font-bold text-center mb-8">CCPLAY GAMES</h1>
+        <h1 className="text-3xl font-bold text-center mb-8">CCPLAY GRUPOS</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-          {jogosFiltrados.map((jogo) => (
+          {gruposFiltrados.map((grupo) => (
             <div
-              key={jogo._id || jogo.id}
+              key={grupo._id || grupo.id}
               className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition flex flex-col"
             >
               <div className="relative w-full h-[400px]">
                 <Image
-                  src={jogo.capa}
-                  alt={jogo.nome}
+                  src={grupo.capa}
+                  alt={grupo.nome}
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 33vw"
@@ -58,26 +58,26 @@ export default function Home({ jogosIniciais }) {
               </div>
 
               <div className="p-4 flex flex-col gap-2">
-                <h2 className="text-lg font-semibold">{jogo.nome}</h2>
+                <h2 className="text-lg font-semibold">{grupo.nome}</h2>
 
-                <p className="mb-2 font-semibold">R$ {Number(jogo.preco).toFixed(2)}</p>
+                <p className="mb-2 font-semibold">Mensalidade: R$ {Number(grupo.preco).toFixed(2)}</p>
 
                 <button
-                  onClick={() => abrirModal(jogo)}
+                  onClick={() => abrirModal(grupo)}
                   className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
                 >
-                  Comprar agora
+                  Entrar no grupo
                 </button>
 
                 <a
-                  href={`https://wa.me/5511997383948?text=Olá! Gostaria de comprar o jogo: ${encodeURIComponent(
-                    jogo.nome
+                  href={`https://wa.me/5511997383948?text=Ola! Quero entrar no grupo de assinatura: ${encodeURIComponent(
+                    grupo.nome
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   <button className="w-full border border-green-600 text-green-600 py-2 rounded hover:bg-green-100 flex items-center justify-center gap-2 transition">
-                    <FaWhatsapp /> Comprar pelo WhatsApp
+                    <FaWhatsapp /> Falar no WhatsApp
                   </button>
                 </a>
               </div>
@@ -86,7 +86,7 @@ export default function Home({ jogosIniciais }) {
         </div>
 
         {/* Modal */}
-        {modalAberto && jogoSelecionado && (
+        {modalAberto && grupoSelecionado && (
           <div
             role="dialog"
             aria-modal="true"
@@ -100,22 +100,23 @@ export default function Home({ jogosIniciais }) {
               >
                 &times;
               </button>
-              <h2 className="text-xl font-bold mb-4">Pagamento - {jogoSelecionado.nome}</h2>
+              <h2 className="text-xl font-bold mb-4">Assinatura - {grupoSelecionado.nome}</h2>
               <p className="mb-4">
-                Valor: <strong>R$ {Number(jogoSelecionado.preco).toFixed(2)}</strong>
+                Mensalidade: <strong>R$ {Number(grupoSelecionado.preco).toFixed(2)}</strong>
               </p>
               <p className="mb-6">
-                Para finalizar a compra, envie o comprovante de pagamento pelo WhatsApp clicando no botão abaixo.
+                Para entrar no grupo, envie o comprovante da primeira mensalidade pelo WhatsApp e aguarde a liberacao
+                do administrador.
               </p>
               <a
-                href={`https://wa.me/5511997383948?text=Olá! Já realizei o pagamento do jogo: ${encodeURIComponent(
-                  jogoSelecionado.nome
+                href={`https://wa.me/5511997383948?text=Ola! Ja paguei a primeira mensalidade do grupo: ${encodeURIComponent(
+                  grupoSelecionado.nome
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition flex items-center justify-center gap-2"
               >
-                <FaWhatsapp /> Enviar comprovante pelo WhatsApp
+                <FaWhatsapp /> Enviar comprovante
               </a>
             </div>
           </div>
@@ -125,14 +126,14 @@ export default function Home({ jogosIniciais }) {
   );
 }
 
-// Busca os jogos do backend
+// Busca os grupos do backend
 export async function getServerSideProps() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/jogos`);
-  const jogosIniciais = await res.json();
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/grupos`);
+  const gruposIniciais = await res.json();
 
   return {
     props: {
-      jogosIniciais,
+      gruposIniciais,
     },
   };
 }

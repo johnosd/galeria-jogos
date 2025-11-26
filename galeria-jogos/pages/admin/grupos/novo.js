@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../../components/Header';
 
-export default function NovoJogo() {
+export default function NovoGrupo() {
   const router = useRouter();
   const [nome, setNome] = useState('');
-  const [capa, setCapa] = useState('/imagens/'); // Estado para o campo de URL da imagem
+  const [capa, setCapa] = useState('/imagens/');
   const [preco, setPreco] = useState('');
   const [msg, setMsg] = useState('');
 
@@ -13,23 +13,23 @@ export default function NovoJogo() {
     e.preventDefault();
 
     if (!nome || !capa || !preco) {
-      setMsg('Todos os campos são obrigatórios.');
+      setMsg('Todos os campos sao obrigatorios.');
       return;
     }
 
     try {
-      const res = await fetch('/api/jogos', {
+      const res = await fetch('/api/grupos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, capa, preco: parseFloat(preco) }),  // Passando o valor do campo de URL da imagem
+        body: JSON.stringify({ nome, capa, preco: parseFloat(preco) }),
       });
 
-      if (!res.ok) throw new Error('Erro ao criar jogo.');
+      if (!res.ok) throw new Error('Erro ao criar grupo.');
 
-      setMsg('Jogo criado com sucesso!');
-      setTimeout(() => router.push('/admin/jogos'), 1500);
+      setMsg('Grupo criado com sucesso!');
+      setTimeout(() => router.push('/admin/grupos'), 1500);
     } catch (error) {
-      setMsg('Erro ao criar jogo.');
+      setMsg('Erro ao criar grupo.');
     }
   };
 
@@ -39,25 +39,24 @@ export default function NovoJogo() {
 
       <main className="pt-[100px] min-h-screen flex flex-col justify-center items-center bg-gray-100 p-4">
         <form onSubmit={handleCriar} className="bg-white p-6 rounded shadow max-w-sm w-full">
-          <h2 className="text-xl font-bold mb-4">Novo Jogo</h2>
+          <h2 className="text-xl font-bold mb-4">Novo Grupo</h2>
           <input
             type="text"
-            placeholder="Nome do Jogo"
+            placeholder="Nome do grupo"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             className="w-full p-3 border rounded mb-4"
           />
-          {/* Agora controlamos o campo de URL da imagem com o estado */}
           <input
             type="text"
             placeholder="URL da imagem (ex: /imagens/novo.jpg)"
-            value={capa} // O valor do campo vem do estado
-            onChange={(e) => setCapa(e.target.value)} // Atualiza o estado ao digitar
+            value={capa}
+            onChange={(e) => setCapa(e.target.value)}
             className="w-full p-3 border rounded mb-4"
           />
           <input
             type="text"
-            placeholder="Valor do Jogo (ex: 120.00)"
+            placeholder="Mensalidade (ex: 29.90)"
             value={preco}
             onChange={(e) => setPreco(e.target.value)}
             className="w-full p-3 border rounded mb-4"
