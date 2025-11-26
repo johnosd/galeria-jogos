@@ -7,21 +7,35 @@ export default function NovoGrupo() {
   const [nome, setNome] = useState('');
   const [capa, setCapa] = useState('/imagens/');
   const [preco, setPreco] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [capacidadeTotal, setCapacidadeTotal] = useState('');
+  const [membrosAtivos, setMembrosAtivos] = useState('');
+  const [pedidosSaida, setPedidosSaida] = useState('');
   const [msg, setMsg] = useState('');
 
   const handleCriar = async (e) => {
     e.preventDefault();
 
     if (!nome || !capa || !preco) {
-      setMsg('Todos os campos sao obrigatorios.');
+      setMsg('Nome, capa e mensalidade sao obrigatorios.');
       return;
     }
+
+    const payload = {
+      nome,
+      capa,
+      preco: parseFloat(preco),
+      descricao,
+      capacidadeTotal: Number(capacidadeTotal) || 0,
+      membrosAtivos: Number(membrosAtivos) || 0,
+      pedidosSaida: Number(pedidosSaida) || 0,
+    };
 
     try {
       const res = await fetch('/api/grupos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, capa, preco: parseFloat(preco) }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error('Erro ao criar grupo.');
@@ -61,6 +75,39 @@ export default function NovoGrupo() {
             onChange={(e) => setPreco(e.target.value)}
             className="w-full p-3 border rounded mb-4"
           />
+          <textarea
+            placeholder="Descricao do grupo (beneficios, regras, etc.)"
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            className="w-full p-3 border rounded mb-4"
+            rows={3}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <input
+              type="number"
+              min="0"
+              placeholder="Capacidade total (ex: 5)"
+              value={capacidadeTotal}
+              onChange={(e) => setCapacidadeTotal(e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="Membros ativos (ex: 4)"
+              value={membrosAtivos}
+              onChange={(e) => setMembrosAtivos(e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="Saidas agendadas"
+              value={pedidosSaida}
+              onChange={(e) => setPedidosSaida(e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
           <button
             type="submit"
             className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 transition"

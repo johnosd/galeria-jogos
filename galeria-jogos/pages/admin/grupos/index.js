@@ -47,28 +47,46 @@ export default function GruposAdmin() {
             <tr className="bg-gray-200">
               <th className="border px-4 py-2">Nome</th>
               <th className="border px-4 py-2">Mensalidade</th>
+              <th className="border px-4 py-2">Membros</th>
+              <th className="border px-4 py-2">Vagas/Fila</th>
               <th className="border px-4 py-2">Acoes</th>
             </tr>
           </thead>
           <tbody>
-            {grupos.map((grupo) => (
-              <tr key={grupo._id}>
-                <td className="border px-4 py-2">{grupo.nome}</td>
-                <td className="border px-4 py-2">R$ {Number(grupo.preco).toFixed(2)}</td>
-                <td className="border px-4 py-2 text-center space-x-2">
-                  <Link href={`/admin/grupos/${grupo._id}`} className="text-blue-600 hover:underline">
-                    Editar
-                  </Link>
-                  <button
-                    onClick={() => handleExcluir(grupo._id)}
-                    disabled={excluindoId === grupo._id}
-                    className="text-red-600 hover:underline disabled:text-red-300"
-                  >
-                    {excluindoId === grupo._id ? 'Excluindo...' : 'Excluir'}
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {grupos.map((grupo) => {
+              const capacidadeBase = grupo.capacidadeTotal ?? grupo.membrosAtivos ?? 0;
+              const capacidade = Number.isFinite(Number(capacidadeBase)) && Number(capacidadeBase) > 0 ? Number(capacidadeBase) : 0;
+              const membros = Number(grupo.membrosAtivos ?? 0);
+              const pedidos = Number(grupo.pedidosSaida ?? 0);
+              const capacidadeUtil = capacidade || membros;
+              const vagas = Math.max(capacidadeUtil - membros, 0);
+              const fila = Math.max(pedidos - vagas, 0);
+
+              return (
+                <tr key={grupo._id}>
+                  <td className="border px-4 py-2">{grupo.nome}</td>
+                  <td className="border px-4 py-2">R$ {Number(grupo.preco).toFixed(2)}</td>
+                  <td className="border px-4 py-2">
+                    {membros}/{capacidadeUtil || 0}
+                  </td>
+                  <td className="border px-4 py-2">
+                    {vagas} vagas / {fila} fila
+                  </td>
+                  <td className="border px-4 py-2 text-center space-x-2">
+                    <Link href={`/admin/grupos/${grupo._id}`} className="text-blue-600 hover:underline">
+                      Editar
+                    </Link>
+                    <button
+                      onClick={() => handleExcluir(grupo._id)}
+                      disabled={excluindoId === grupo._id}
+                      className="text-red-600 hover:underline disabled:text-red-300"
+                    >
+                      {excluindoId === grupo._id ? 'Excluindo...' : 'Excluir'}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </main>

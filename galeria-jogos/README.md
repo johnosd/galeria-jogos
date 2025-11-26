@@ -46,7 +46,7 @@ EMAIL_PASS=
 - Lint: `npm run lint`
 
 ## Proximos passos
-- Enriquecer card do grupo com descricao, contagem de membros e status de vagas/fila.
+- Enriquecer card do grupo com descricao, contagem de membros, contagem de vagas/fila.
 - Permitir entrada direta ou fila de espera com verificacao de vagas e previsao de liberacao.
 - Publicar em producao (ex.: Vercel) com secrets configuradas e variaveis de ambiente separadas por stage.
 - Trocar a senha fixa de `/admin` por controle de acesso baseado no usuario autenticado e roles no banco.
@@ -60,3 +60,6 @@ EMAIL_PASS=
 - API routes (`pages/api/*`): use breakpoints no VS Code com o inspector ativo ou adicione `console.log`.
 - UI: use React/Next DevTools no navegador; o hot reload do `next dev` reflete mudancas em tempo real.
 - Problemas com e-mail: valide `EMAIL_USER`/`EMAIL_PASS` e, em ambiente de testes, considere provedores como Ethereal/SMTP de sandbox.
+
+## Instruçoes GPT
+- Pergunte o que for necessário para iniciar uma tarefa

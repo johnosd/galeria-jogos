@@ -23,6 +23,18 @@ export default function Home({ gruposIniciais }) {
     setGrupoSelecionado(null);
   }
 
+  const calcularStatusGrupo = (grupo) => {
+    const capacidadeBase = grupo.capacidadeTotal ?? grupo.membrosAtivos ?? 0;
+    const capacidadeNum = Number(capacidadeBase);
+    const membrosAtivos = Number(grupo.membrosAtivos ?? 0);
+    const capacidade = Number.isFinite(capacidadeNum) && capacidadeNum > 0 ? capacidadeNum : membrosAtivos;
+    const pedidosSaida = Number(grupo.pedidosSaida ?? 0);
+    const vagasDisponiveis = Math.max(capacidade - membrosAtivos, 0);
+    const vagasFila = Math.max(pedidosSaida - vagasDisponiveis, 0);
+
+    return { capacidade, membrosAtivos, vagasDisponiveis, vagasFila };
+  };
+
   return (
     <>
       <Header />
@@ -59,6 +71,32 @@ export default function Home({ gruposIniciais }) {
 
               <div className="p-4 flex flex-col gap-2">
                 <h2 className="text-lg font-semibold">{grupo.nome}</h2>
+
+                {grupo.descricao && (
+                  <p className="text-sm text-gray-700 leading-relaxed max-h-20 overflow-hidden">
+                    {grupo.descricao}
+                  </p>
+                )}
+
+                {(() => {
+                  const { capacidade, membrosAtivos, vagasDisponiveis, vagasFila } = calcularStatusGrupo(grupo);
+                  return (
+                    <div className="space-y-1 text-sm text-gray-800">
+                      <p>
+                        Membros: <strong>{membrosAtivos}</strong>
+                        {capacidade ? ` / ${capacidade}` : ''}
+                      </p>
+                      <p className={vagasDisponiveis > 0 ? 'text-green-700 font-semibold' : 'text-gray-700'}>
+                        {vagasDisponiveis > 0 ? `${vagasDisponiveis} vaga(s) aberta(s)` : 'Grupo completo'}
+                      </p>
+                      {vagasFila > 0 && (
+                        <p className="text-amber-700">
+                          Fila de espera: <strong>{vagasFila}</strong> (aguardando saida agendada)
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <p className="mb-2 font-semibold">Mensalidade: R$ {Number(grupo.preco).toFixed(2)}</p>
 
@@ -101,6 +139,25 @@ export default function Home({ gruposIniciais }) {
                 &times;
               </button>
               <h2 className="text-xl font-bold mb-4">Assinatura - {grupoSelecionado.nome}</h2>
+              {(() => {
+                const { capacidade, membrosAtivos, vagasDisponiveis, vagasFila } = calcularStatusGrupo(grupoSelecionado);
+                return (
+                  <div className="text-sm text-gray-800 space-y-1 mb-3">
+                    <p>
+                      Membros: <strong>{membrosAtivos}</strong>
+                      {capacidade ? ` / ${capacidade}` : ''}
+                    </p>
+                    <p className={vagasDisponiveis > 0 ? 'text-green-700 font-semibold' : 'text-gray-700'}>
+                      {vagasDisponiveis > 0 ? `${vagasDisponiveis} vaga(s) aberta(s)` : 'Grupo completo'}
+                    </p>
+                    {vagasFila > 0 && (
+                      <p className="text-amber-700">
+                        Fila de espera: <strong>{vagasFila}</strong> (aguardando saida agendada)
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               <p className="mb-4">
                 Mensalidade: <strong>R$ {Number(grupoSelecionado.preco).toFixed(2)}</strong>
               </p>
