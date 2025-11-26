@@ -7,6 +7,7 @@ Aplicacao web para compartilhamento de assinaturas via grupos: lista grupos de a
 - Tailwind CSS 3
 - NextAuth (OAuth Google + JWT)
 - MongoDB (driver oficial) e SWR para revalidacao no cliente
+    - Painel MongoDB: https://cloud.mongodb.com/v2/683f2cb1941e50655caee2e1#/overview
 - Nodemailer para envio de codigos de verificacao
 - React Icons para os botoes e chamadas de acao
 
