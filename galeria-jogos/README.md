@@ -1,40 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# CCPlay Games
 
-## Getting Started
+Aplicacao web para compartilhamento de assinaturas de apps, jogos e streaming: lista o catalogo com busca, abre modal de pagamento e redireciona para WhatsApp. Ha login com Google (NextAuth), cadastro complementar, verificacao de conta por e-mail, edicao de perfil e area administrativa para criar, editar e excluir jogos armazenados em MongoDB.
 
-First, run the development server:
+## Stack
+- Next.js 14 (Pages Router) + React 18
+- Tailwind CSS 3
+- NextAuth (OAuth Google + JWT)
+- MongoDB (driver oficial) e SWR para revalidacao no cliente
+- Nodemailer para envio de codigos de verificacao
+- React Icons para os botoes e chamadas de acao
 
+## Principais fluxos
+- Home (`/`): lista jogos vindos de `/api/jogos`, busca em tempo real e CTA de compra via WhatsApp com modal de orientacao.
+- Autenticacao: `/auth/signin` faz login com Google; novos usuarios seguem para `/cadastro` e validam e-mail em `/verificacao`.
+- Perfil: `/perfil` edita nome, sobrenome, telefone e username; atualiza os dados do MongoDB.
+- Admin: `/admin` (senha fixa em `pages/admin/index.js`) libera `/admin/jogos` para CRUD de jogos (`/api/jogos` e `/api/jogos/[id]`).
+
+## Requisitos
+- Node.js 18+ e npm
+- Banco MongoDB (URI e nome do database)
+- Credenciais OAuth do Google e conta SMTP (ex.: Gmail) para envio de codigos
+
+## Configuracao
+1) Na raiz `galeria-jogos`, instale dependencias:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
+2) Crie `.env.local` com as variaveis (sem aspas):
+```bash
+MONGODB_URI=
+MONGODB_DB=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+EMAIL_USER=
+EMAIL_PASS=
+```
+3) Opcional: ajuste a senha administrativa em `pages/admin/index.js` (const `SENHA`).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Executar
+- Desenvolvimento: `npm run dev` e acesse http://localhost:3000
+- Producao local: `npm run build` seguido de `npm start`
+- Lint: `npm run lint`
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
-
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
-
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
-
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+## Debug
+- Inspecionar Next.js em modo dev: `$env:NODE_OPTIONS="--inspect"; npm run dev` (PowerShell) e conecte o inspector do VS Code/Chrome em `localhost:9229`.
+- API routes (`pages/api/*`): use breakpoints no VS Code com o inspector ativo ou adicione `console.log`.
+- UI: use React/Next DevTools no navegador; o hot reload do `next dev` reflete mudancas em tempo real.
+- Problemas com e-mail: valide `EMAIL_USER`/`EMAIL_PASS` e, em ambiente de testes, considere provedores como Ethereal/SMTP de sandbox.
