@@ -32,7 +32,7 @@ export default function AdminLogin() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (senha === SENHA) {
-      router.push('/admin/jogos');
+      router.push('/admin/grupos');
     } else {
       setErro('Senha incorreta');
     }

@@ -48,14 +48,14 @@ export default function Header({ admin = false }) {
                     className="block px-4 py-2 hover:bg-gray-600"
                     onClick={() => setMenuAberto(false)}
                   >
-                    Administração
+                    Administracao
                   </Link>
                   <Link
                     href="/"
                     className="block px-4 py-2 hover:bg-gray-600"
                     onClick={() => setMenuAberto(false)}
                   >
-                    Página Inicial
+                    Pagina Inicial
                   </Link>
                   {!session.user?.contaValidada && (
                     <Link
