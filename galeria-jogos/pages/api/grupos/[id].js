@@ -6,6 +6,12 @@ export default async function handler(req, res) {
   const db = client.db(process.env.MONGODB_DB);
   const { id } = req.query;
 
+  const parseNumero = (valor, padrao = 0) => {
+    const numero = Number(valor);
+    if (!Number.isFinite(numero)) return padrao;
+    return numero < 0 ? 0 : numero;
+  };
+
   if (!ObjectId.isValid(id)) {
     return res.status(400).json({ error: 'ID invalido' });
   }
@@ -21,15 +27,30 @@ export default async function handler(req, res) {
       res.status(500).json({ error: 'Erro ao buscar grupo' });
     }
   } else if (req.method === 'PUT') {
-    const { nome, capa, preco } = req.body;
-    if (!nome || !capa || preco === undefined) {
-      return res.status(400).json({ error: 'Nome, capa e preco sao obrigatorios' });
+    const { nome, capa, preco, descricao = '', capacidadeTotal, membrosAtivos, pedidosSaida } = req.body;
+    const precoNumero = Number(preco);
+    const capacidadeNumero = parseNumero(capacidadeTotal);
+    const membrosNumero = parseNumero(membrosAtivos);
+    const pedidosNumero = parseNumero(pedidosSaida);
+
+    if (!nome || !capa || preco === undefined || !Number.isFinite(precoNumero)) {
+      return res.status(400).json({ error: 'Nome, capa e preco validos sao obrigatorios' });
     }
 
     try {
       const resultado = await db.collection('grupos').updateOne(
         { _id: new ObjectId(id) },
-        { $set: { nome, capa, preco: parseFloat(preco) } }
+        {
+          $set: {
+            nome,
+            capa,
+            preco: precoNumero,
+            descricao,
+            capacidadeTotal: capacidadeNumero,
+            membrosAtivos: membrosNumero,
+            pedidosSaida: pedidosNumero,
+          },
+        }
       );
 
       if (resultado.matchedCount === 0) {

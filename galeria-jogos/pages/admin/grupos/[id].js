@@ -7,6 +7,10 @@ export default function EditarGrupo({ grupo }) {
   const [nome, setNome] = useState(grupo.nome);
   const [capa, setCapa] = useState(grupo.capa);
   const [preco, setPreco] = useState(grupo.preco);
+  const [descricao, setDescricao] = useState(grupo.descricao || '');
+  const [capacidadeTotal, setCapacidadeTotal] = useState(grupo.capacidadeTotal ?? '');
+  const [membrosAtivos, setMembrosAtivos] = useState(grupo.membrosAtivos ?? '');
+  const [pedidosSaida, setPedidosSaida] = useState(grupo.pedidosSaida ?? '');
   const [msg, setMsg] = useState('');
 
   const handleAtualizar = async (e) => {
@@ -16,7 +20,15 @@ export default function EditarGrupo({ grupo }) {
       const res = await fetch(`/api/grupos/${grupo._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, capa, preco: parseFloat(preco) }),
+        body: JSON.stringify({
+          nome,
+          capa,
+          preco: parseFloat(preco),
+          descricao,
+          capacidadeTotal: Number(capacidadeTotal) || 0,
+          membrosAtivos: Number(membrosAtivos) || 0,
+          pedidosSaida: Number(pedidosSaida) || 0,
+        }),
       });
 
       if (!res.ok) throw new Error('Erro ao atualizar grupo');
@@ -55,6 +67,39 @@ export default function EditarGrupo({ grupo }) {
             onChange={(e) => setPreco(e.target.value)}
             className="w-full p-3 border rounded mb-4"
           />
+          <textarea
+            placeholder="Descricao do grupo"
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            className="w-full p-3 border rounded mb-4"
+            rows={3}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <input
+              type="number"
+              min="0"
+              placeholder="Capacidade total"
+              value={capacidadeTotal}
+              onChange={(e) => setCapacidadeTotal(e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="Membros ativos"
+              value={membrosAtivos}
+              onChange={(e) => setMembrosAtivos(e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="Saidas agendadas"
+              value={pedidosSaida}
+              onChange={(e) => setPedidosSaida(e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
           <button
             type="submit"
             className="w-full bg-green-600 text-white py-3 rounded hover:bg-green-700 transition"
