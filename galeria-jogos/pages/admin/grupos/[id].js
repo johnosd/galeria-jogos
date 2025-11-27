@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../../components/Header';
 
@@ -53,9 +53,11 @@ export default function EditarGrupo({ grupo }) {
   const [adminSelos, setAdminSelos] = useState(listToText(grupo.admin?.selos) || 'Mais de 1 grupo ativo\n+1 ano de plataforma\nEnvio rapido');
   const [participantes, setParticipantes] = useState(listToText(grupo.participantes) || 'Deyves\nLuciene\nRafael\nNicholas');
   const [msg, setMsg] = useState('');
+  const fileInputRef = useRef(null);
 
-  const handleUploadImagem = async () => {
-    if (!imagemFile) {
+  const handleUploadImagem = async (selectedFile) => {
+    const file = selectedFile || imagemFile;
+    if (!file) {
       setMsg('Selecione uma imagem antes de enviar.');
       return;
     }
@@ -63,7 +65,7 @@ export default function EditarGrupo({ grupo }) {
     setMsg('');
     const formData = new FormData();
     formData.append('groupId', grupo._id);
-    formData.append('file', imagemFile);
+    formData.append('file', file);
     try {
       const res = await fetch('/api/upload/group-image', {
         method: 'POST',
@@ -163,6 +165,7 @@ export default function EditarGrupo({ grupo }) {
             </div>
             <div className="flex flex-col gap-2">
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 onChange={(e) => {
@@ -170,14 +173,15 @@ export default function EditarGrupo({ grupo }) {
                   if (file) {
                     setImagemFile(file);
                     setImagemPreview(URL.createObjectURL(file));
+                    handleUploadImagem(file);
                   }
                 }}
-                className="text-sm"
+                className="hidden"
               />
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={handleUploadImagem}
+                  onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImg}
                   className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:bg-blue-300"
                 >
@@ -209,13 +213,7 @@ export default function EditarGrupo({ grupo }) {
             onChange={(e) => setSubtitulo(e.target.value)}
             className="w-full p-3 border rounded mb-4"
           />
-          <input
-            type="text"
-            placeholder="URL da imagem (ex: /imagens/novo.jpg)"
-            value={capa}
-            onChange={(e) => setCapa(e.target.value)}
-            className="w-full p-3 border rounded mb-4"
-          />
+          <input type="hidden" value={capa} readOnly aria-hidden="true" />
           <input
             type="text"
             placeholder="Mensalidade (ex: 120.00)"
