@@ -185,12 +185,10 @@ export default function GrupoDetalhe({ grupo }) {
                 </div>
                 <p className="text-sm text-gray-700">Pagamento mensal, renovacao automatica e acompanhamento do acesso pelo administrador.</p>
                 <Link
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="/assinatura/relacionamento"
                   className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition"
                 >
-                  <FaWhatsapp /> Falar no WhatsApp
+                  <FaWhatsapp /> Assinar
                 </Link>
               </div>
             </div>
