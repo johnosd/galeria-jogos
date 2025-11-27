@@ -5,7 +5,11 @@ import Header from '../../../components/Header';
 export default function NovoGrupo() {
   const router = useRouter();
   const [nome, setNome] = useState('');
-  const [capa, setCapa] = useState('/imagens/');
+  const [capa, setCapa] = useState('');
+  const [imagemPreview, setImagemPreview] = useState('');
+  const [imagemFile, setImagemFile] = useState(null);
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [imageKey, setImageKey] = useState('');
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
   const [capacidadeTotal, setCapacidadeTotal] = useState('');
@@ -31,18 +35,24 @@ export default function NovoGrupo() {
   const [adminSelos, setAdminSelos] = useState('Mais de 1 grupo ativo\n+1 ano de plataforma\nEnvio rapido');
   const [participantes, setParticipantes] = useState('Deyves\nLuciene\nRafael\nNicholas');
   const [msg, setMsg] = useState('');
+  const [criando, setCriando] = useState(false);
 
   const handleCriar = async (e) => {
     e.preventDefault();
 
-    if (!nome || !capa || !preco) {
-      setMsg('Nome, capa e mensalidade sao obrigatorios.');
+    if (!nome || !preco) {
+      setMsg('Nome e mensalidade sao obrigatorios.');
       return;
     }
+
+    setCriando(true);
+    setMsg('');
 
     const payload = {
       nome,
       capa,
+      imageUrl: capa,
+      imageKey,
       preco: parseFloat(preco),
       descricao,
       capacidadeTotal: Number(capacidadeTotal) || 0,
@@ -72,11 +82,31 @@ export default function NovoGrupo() {
 
       if (!res.ok) throw new Error('Erro ao criar grupo.');
 
+      const data = await res.json();
+
+      if (imagemFile && data?._id) {
+        setUploadingImg(true);
+        const formData = new FormData();
+        formData.append('groupId', data._id);
+        formData.append('file', imagemFile);
+        const uploadRes = await fetch('/api/upload/group-image', {
+          method: 'POST',
+          body: formData,
+        });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploadData?.error || 'Erro ao enviar imagem');
+        setCapa(uploadData.url);
+        setImagemPreview(uploadData.url);
+        if (uploadData.key) setImageKey(uploadData.key);
+      }
+
       setMsg('Grupo criado com sucesso!');
       setTimeout(() => router.push('/admin/grupos'), 1500);
     } catch (error) {
-      setMsg('Erro ao criar grupo.');
+      setMsg(error.message || 'Erro ao criar grupo.');
     }
+    setCriando(false);
+    setUploadingImg(false);
   };
 
   return (
@@ -86,6 +116,32 @@ export default function NovoGrupo() {
       <main className="pt-[100px] min-h-screen flex flex-col justify-center items-center bg-gray-100 p-4">
         <form onSubmit={handleCriar} className="bg-white p-6 rounded shadow max-w-2xl w-full space-y-4">
           <h2 className="text-xl font-bold mb-4">Novo Grupo</h2>
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center border">
+              {imagemPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imagemPreview} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <i className="fa fa-users text-gray-500 text-xl" aria-hidden="true"></i>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImagemFile(file);
+                    setImagemPreview(URL.createObjectURL(file));
+                  }
+                }}
+                className="text-sm"
+              />
+              <p className="text-xs text-gray-500">Formatos: jpg, png, webp. Max 5MB.</p>
+              {uploadingImg && <p className="text-xs text-blue-600">Enviando imagem...</p>}
+            </div>
+          </div>
           <input
             type="text"
             placeholder="Nome do grupo"
@@ -98,13 +154,6 @@ export default function NovoGrupo() {
             placeholder="Subtitulo (ex: Premium Anual - 2 TB)"
             value={subtitulo}
             onChange={(e) => setSubtitulo(e.target.value)}
-            className="w-full p-3 border rounded mb-4"
-          />
-          <input
-            type="text"
-            placeholder="URL da imagem (ex: /imagens/novo.jpg)"
-            value={capa}
-            onChange={(e) => setCapa(e.target.value)}
             className="w-full p-3 border rounded mb-4"
           />
           <input
@@ -237,9 +286,10 @@ export default function NovoGrupo() {
           />
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 transition"
+            className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 transition disabled:bg-blue-300"
+            disabled={criando}
           >
-            Criar
+            {criando ? 'Criando...' : 'Criar'}
           </button>
           {msg && <p className="mt-4 text-red-600">{msg}</p>}
         </form>

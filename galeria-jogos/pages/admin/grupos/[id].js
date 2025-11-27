@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../../components/Header';
 
 export default function EditarGrupo({ grupo }) {
   const router = useRouter();
   const [nome, setNome] = useState(grupo.nome);
-  const [capa, setCapa] = useState(grupo.capa);
+  const [capa, setCapa] = useState(grupo.imageUrl || grupo.capa);
+  const [imagemPreview, setImagemPreview] = useState(grupo.imageUrl || grupo.capa || '');
+  const [imagemFile, setImagemFile] = useState(null);
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [imageKey, setImageKey] = useState(grupo.imageKey || '');
   const [preco, setPreco] = useState(grupo.preco);
   const [descricao, setDescricao] = useState(grupo.descricao || '');
   const [capacidadeTotal, setCapacidadeTotal] = useState(grupo.capacidadeTotal ?? '');
@@ -49,6 +53,58 @@ export default function EditarGrupo({ grupo }) {
   const [adminSelos, setAdminSelos] = useState(listToText(grupo.admin?.selos) || 'Mais de 1 grupo ativo\n+1 ano de plataforma\nEnvio rapido');
   const [participantes, setParticipantes] = useState(listToText(grupo.participantes) || 'Deyves\nLuciene\nRafael\nNicholas');
   const [msg, setMsg] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleUploadImagem = async (selectedFile) => {
+    const file = selectedFile || imagemFile;
+    if (!file) {
+      setMsg('Selecione uma imagem antes de enviar.');
+      return;
+    }
+    setUploadingImg(true);
+    setMsg('');
+    const formData = new FormData();
+    formData.append('groupId', grupo._id);
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/upload/group-image', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Erro ao enviar imagem');
+      setCapa(data.url);
+      setImagemPreview(data.url);
+      if (data.key) setImageKey(data.key);
+      setMsg('Imagem atualizada com sucesso!');
+    } catch (error) {
+      setMsg(error.message || 'Erro ao enviar imagem');
+    } finally {
+      setUploadingImg(false);
+    }
+  };
+
+  const handleRemoverImagem = async () => {
+    setUploadingImg(true);
+    setMsg('');
+    try {
+      const res = await fetch('/api/upload/remove-group-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId: grupo._id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Erro ao remover imagem');
+      setCapa('');
+      setImagemPreview('');
+      setImageKey('');
+      setMsg('Imagem removida.');
+    } catch (error) {
+      setMsg(error.message || 'Erro ao remover imagem');
+    } finally {
+      setUploadingImg(false);
+    }
+  };
 
   const handleAtualizar = async (e) => {
     e.preventDefault();
@@ -65,6 +121,8 @@ export default function EditarGrupo({ grupo }) {
           capacidadeTotal: Number(capacidadeTotal) || 0,
           membrosAtivos: Number(membrosAtivos) || 0,
           pedidosSaida: Number(pedidosSaida) || 0,
+          imageUrl: capa,
+          imageKey,
           subtitulo,
           acesso,
           tempoEntrega,
@@ -96,6 +154,51 @@ export default function EditarGrupo({ grupo }) {
       <main className="pt-[100px] min-h-screen flex flex-col justify-center items-center bg-gray-100 p-4">
         <form onSubmit={handleAtualizar} className="bg-white p-6 rounded shadow max-w-2xl w-full space-y-4">
           <h2 className="text-xl font-bold mb-4">Editar Grupo</h2>
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center border">
+              {imagemPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imagemPreview} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <i className="fa fa-users text-gray-500 text-xl" aria-hidden="true"></i>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImagemFile(file);
+                    setImagemPreview(URL.createObjectURL(file));
+                    handleUploadImagem(file);
+                  }
+                }}
+                className="hidden"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImg}
+                  className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:bg-blue-300"
+                >
+                  {uploadingImg ? 'Enviando...' : 'Alterar imagem'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoverImagem}
+                  disabled={uploadingImg}
+                  className="px-4 py-2 rounded bg-gray-200 text-gray-800 text-sm font-semibold hover:bg-gray-300 disabled:bg-gray-100"
+                >
+                  Remover
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">Formatos: jpg, png, webp. Max 5MB.</p>
+            </div>
+          </div>
           <input
             type="text"
             placeholder="Nome do grupo"
@@ -110,13 +213,7 @@ export default function EditarGrupo({ grupo }) {
             onChange={(e) => setSubtitulo(e.target.value)}
             className="w-full p-3 border rounded mb-4"
           />
-          <input
-            type="text"
-            placeholder="URL da imagem (ex: /imagens/novo.jpg)"
-            value={capa}
-            onChange={(e) => setCapa(e.target.value)}
-            className="w-full p-3 border rounded mb-4"
-          />
+          <input type="hidden" value={capa} readOnly aria-hidden="true" />
           <input
             type="text"
             placeholder="Mensalidade (ex: 120.00)"

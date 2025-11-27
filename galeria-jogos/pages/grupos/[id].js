@@ -67,7 +67,7 @@ export default function GrupoDetalhe({ grupo }) {
   const nome = dados.nome || DEFAULT_CONTENT.nome;
   const preco = Number.isFinite(Number(dados.preco)) ? Number(dados.preco) : DEFAULT_CONTENT.preco;
   const descricao = dados.descricao || DEFAULT_CONTENT.descricao;
-  const capa = dados.capa || '';
+  const capa = dados.imageUrl || dados.capa || '';
 
   const titulo = `${nome} ${dados.subtitulo ? `- ${dados.subtitulo}` : DEFAULT_CONTENT.subtitulo}`;
   const acesso = dados.acesso || DEFAULT_CONTENT.acesso;

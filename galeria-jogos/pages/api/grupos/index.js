@@ -58,6 +58,8 @@ export default async function handler(req, res) {
       const {
         nome,
         capa,
+        imageUrl = '',
+        imageKey = '',
         preco,
         descricao = '',
         subtitulo = '',
@@ -82,13 +84,25 @@ export default async function handler(req, res) {
       const membrosNumero = parseNumero(membrosAtivos);
       const pedidosNumero = parseNumero(pedidosSaida);
 
-      if (!nome || !capa || preco === undefined || !Number.isFinite(precoNumero)) {
-        return res.status(400).json({ error: 'Nome, capa e preco validos sao obrigatorios' });
+      if (!nome || preco === undefined || !Number.isFinite(precoNumero)) {
+        return res.status(400).json({ error: 'Nome e preco validos sao obrigatorios' });
+      }
+
+      const imagemFinal = imageUrl || capa || '';
+      if (!imagemFinal) {
+        // Permite criacao sem imagem, mas deixa vazio para ser atualizada via upload depois
+      } else {
+        // Normaliza para capa/imageUrl quando houver
+        if (!imageUrl) {
+          req.body.imageUrl = imagemFinal;
+        }
       }
 
       const novoGrupo = {
         nome,
-        capa,
+        capa: imagemFinal,
+        imageUrl: imageUrl || imagemFinal,
+        imageKey,
         preco: precoNumero,
         descricao,
         capacidadeTotal: capacidadeNumero,

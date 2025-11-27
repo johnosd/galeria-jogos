@@ -46,6 +46,7 @@ export default function Home({ gruposIniciais }) {
           {gruposFiltrados.map((grupo) => {
             const grupoId = grupo._id || grupo.id;
             const { capacidade, membrosAtivos, vagasDisponiveis, vagasFila } = calcularStatusGrupo(grupo);
+            const imageSrc = grupo.imageUrl || grupo.capa;
 
             return (
               <div
@@ -53,9 +54,9 @@ export default function Home({ gruposIniciais }) {
                 className="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition flex flex-col gap-4 p-5 h-full"
               >
                 <div className="flex items-start gap-4">
-                  {grupo.capa ? (
+                  {imageSrc ? (
                     <Image
-                      src={grupo.capa}
+                      src={imageSrc}
                       alt={grupo.nome}
                       width={64}
                       height={64}
