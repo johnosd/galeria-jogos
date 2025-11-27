@@ -5,7 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 
 export default function Header({ admin = false }) {
   const [menuAberto, setMenuAberto] = useState(false);
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/' });
@@ -28,7 +28,16 @@ export default function Header({ admin = false }) {
           />
         </Link>
 
-        <div className="absolute right-6">
+        <div className="flex items-center gap-3 ml-auto relative">
+          {status !== 'loading' && !session && (
+            <Link
+              href="/auth/signin"
+              className="hidden sm:inline-block bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white transition"
+            >
+              Entrar
+            </Link>
+          )}
+
           <button
             onClick={() => setMenuAberto(!menuAberto)}
             className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded focus:outline-none"
@@ -40,7 +49,7 @@ export default function Header({ admin = false }) {
           </button>
 
           {menuAberto && (
-            <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded shadow-lg text-white z-[9999]">
+            <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded shadow-lg text-white z-[9999]">
               {session ? (
                 <>
                   <Link
@@ -81,13 +90,22 @@ export default function Header({ admin = false }) {
                   </button>
                 </>
               ) : (
-                <Link
-                  href="/auth/signin"
-                  className="block px-4 py-2 hover:bg-gray-600"
-                  onClick={() => setMenuAberto(false)}
-                >
-                  Entrar
-                </Link>
+                <>
+                  <Link
+                    href="/auth/signin"
+                    className="block px-4 py-2 hover:bg-gray-600"
+                    onClick={() => setMenuAberto(false)}
+                  >
+                    Entrar
+                  </Link>
+                  <Link
+                    href="/"
+                    className="block px-4 py-2 hover:bg-gray-600"
+                    onClick={() => setMenuAberto(false)}
+                  >
+                    Pagina Inicial
+                  </Link>
+                </>
               )}
             </div>
           )}
