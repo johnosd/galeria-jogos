@@ -6,21 +6,17 @@ import Header from '../../components/Header';
 
 const DEFAULT_CONTENT = {
   nome: 'Google One',
-  subtitulo: 'Premium Anual – 2 TB',
-  descricao: 'Armazenamento compartilhado com contas individuais preservando sua privacidade e espaço garantido.',
+  subtitulo: 'Premium Anual - 2 TB',
+  descricao: 'Armazenamento compartilhado com contas individuais preservando privacidade e espaco garantido.',
   preco: 10.44,
   confiabilidade: 'Selo ouro',
-  tempoEntrega: 'Até 5 dias (geralmente mais rápido)',
+  tempoEntrega: 'Ate 5 dias (geralmente mais rapido)',
   acesso: 'Convite',
   vagas: { total: 6, ocupadas: 5 },
   admin: {
     nome: 'Isabela',
     avatar: 'https://i.pravatar.cc/160?img=47',
-    selos: [
-      { label: 'Mais de 1 grupo ativo', icon: 'fa-circle-check' },
-      { label: '+1 ano de plataforma', icon: 'fa-award' },
-      { label: 'Envio rápido', icon: 'fa-bolt' },
-    ],
+    selos: ['Mais de 1 grupo ativo', '+1 ano de plataforma', 'Envio rapido'],
   },
   participantes: [
     { nome: 'Deyves', avatar: 'https://i.pravatar.cc/120?img=15' },
@@ -32,21 +28,21 @@ const DEFAULT_CONTENT = {
     'Armazenamento 2 TB compartilhado',
     'Contas individuais preservam privacidade',
     'Pagamento mensal',
-    'Grupo já está ativo',
-    'Administrador confiável',
-    'Envio de acesso rápido',
+    'Grupo ja esta ativo',
+    'Administrador confiavel',
+    'Envio de acesso rapido',
   ],
   fidelidade: [
     'Compromisso de 12 meses',
-    'Cancelamento não permitido durante fidelidade',
-    'Renovação automática',
-    'Próxima renovação: 22/05/2026',
+    'Cancelamento nao permitido durante fidelidade',
+    'Renovacao automatica',
+    'Proxima renovacao: 22/05/2026',
   ],
-  regras: ['Não compartilhar senha', 'Não postar em nome do administrador', 'Não alterar senha'],
+  regras: ['Nao compartilhar senha', 'Nao postar em nome do administrador', 'Nao alterar senha'],
   faq: [
-    { pergunta: 'Quando terei acesso ao serviço?', resposta: 'O acesso é enviado em até 5 dias, normalmente no mesmo dia.' },
-    { pergunta: 'Quais formas de pagamento?', resposta: 'Pix ou cartão pelos métodos do administrador do grupo.' },
-    { pergunta: 'O que é caução?', resposta: 'Valor de segurança em casos específicos; avisaremos antes se for necessário.' },
+    { pergunta: 'Quando terei acesso ao servico?', resposta: 'O acesso e enviado em ate 5 dias, normalmente no mesmo dia.' },
+    { pergunta: 'Quais formas de pagamento?', resposta: 'Pix ou cartao pelos metodos do administrador do grupo.' },
+    { pergunta: 'O que e caucao?', resposta: 'Valor de seguranca em casos especificos; avisaremos antes se for necessario.' },
     { pergunta: 'Com quem posso dividir assinaturas?', resposta: 'Apenas com membros aprovados pelo administrador do grupo.' },
   ],
   linkOficial: 'https://one.google.com/',
@@ -70,13 +66,29 @@ export default function GrupoDetalhe({ grupo }) {
   const descricao = dados.descricao || DEFAULT_CONTENT.descricao;
   const capa = dados.capa || '';
 
-  const titulo = `${nome} ${dados.subtitulo ? `– ${dados.subtitulo}` : DEFAULT_CONTENT.subtitulo}`;
-  const acesso = DEFAULT_CONTENT.acesso;
-  const tempoEntrega = DEFAULT_CONTENT.tempoEntrega;
-  const confiabilidade = DEFAULT_CONTENT.confiabilidade;
+  const titulo = `${nome} ${dados.subtitulo ? `- ${dados.subtitulo}` : DEFAULT_CONTENT.subtitulo}`;
+  const acesso = dados.acesso || DEFAULT_CONTENT.acesso;
+  const tempoEntrega = dados.tempoEntrega || DEFAULT_CONTENT.tempoEntrega;
+  const confiabilidade = dados.confiabilidade || DEFAULT_CONTENT.confiabilidade;
+  const beneficios = Array.isArray(dados.beneficios) && dados.beneficios.length ? dados.beneficios : DEFAULT_CONTENT.beneficios;
+  const fidelidade = Array.isArray(dados.fidelidade) && dados.fidelidade.length ? dados.fidelidade : DEFAULT_CONTENT.fidelidade;
+  const regras = Array.isArray(dados.regras) && dados.regras.length ? dados.regras : DEFAULT_CONTENT.regras;
+  const faq = Array.isArray(dados.faq) && dados.faq.length ? dados.faq : DEFAULT_CONTENT.faq;
+  const linkOficial = dados.linkOficial || DEFAULT_CONTENT.linkOficial;
+  const adminNome = dados.admin?.nome || DEFAULT_CONTENT.admin.nome;
+  const adminAvatar = dados.admin?.avatar || DEFAULT_CONTENT.admin.avatar;
+  const adminSelos = Array.isArray(dados.admin?.selos) && dados.admin?.selos.length ? dados.admin.selos : DEFAULT_CONTENT.admin.selos;
+  const participantes =
+    Array.isArray(dados.participantes) && dados.participantes.length
+      ? dados.participantes.map((item, idx) =>
+          typeof item === 'string'
+            ? { nome: item, avatar: `https://i.pravatar.cc/120?img=${(idx % 70) + 1}` }
+            : { nome: item?.nome || `Membro ${idx + 1}`, avatar: item?.avatar || `https://i.pravatar.cc/120?img=${(idx % 70) + 1}` }
+        )
+      : DEFAULT_CONTENT.participantes;
 
   const whatsappLink = `https://wa.me/5511997383948?text=${encodeURIComponent(
-    `Olá! Quero entrar no grupo de assinatura: ${nome}`
+    `Ola! Quero entrar no grupo de assinatura: ${nome}`
   )}`;
 
   return (
@@ -115,16 +127,16 @@ export default function GrupoDetalhe({ grupo }) {
                   <HeroStat icon={<FaUsers />} label="Vagas restantes" value={`${vagasDisponiveis || 0} de ${capacidade}`} emphasis />
                   <HeroStat icon={<FaClock />} label="Entrega" value={tempoEntrega} />
                   <HeroStat icon={<FaShieldAlt />} label="Acesso" value={acesso} />
-                  <HeroStat icon={<FaCrown />} label="Admin" value={DEFAULT_CONTENT.admin.nome} />
-                  <HeroStat icon={<FaExternalLinkAlt />} label="Plano" value="Google One Anual" />
+                  <HeroStat icon={<FaCrown />} label="Admin" value={adminNome} />
+                  <HeroStat icon={<FaExternalLinkAlt />} label="Plano" value={dados.subtitulo || 'Plano anual'} />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="text-3xl font-extrabold text-gray-900">
                     R$ {preco.toFixed(2)}
-                    <span className="text-sm text-gray-600 font-semibold ml-1">/mês</span>
+                    <span className="text-sm text-gray-600 font-semibold ml-1">/mes</span>
                   </div>
-                  <Badge text={vagasDisponiveis > 0 ? 'Vagas disponíveis' : 'Últimas vagas'} variant={vagasDisponiveis > 0 ? 'success' : 'warning'} />
+                  <Badge text={vagasDisponiveis > 0 ? 'Vagas disponiveis' : 'Ultimas vagas'} variant={vagasDisponiveis > 0 ? 'success' : 'warning'} />
                   <Badge text="Convite seguro" variant="info" />
                 </div>
 
@@ -146,10 +158,10 @@ export default function GrupoDetalhe({ grupo }) {
 
             <div className="flex flex-col gap-4">
               <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 text-white rounded-2xl shadow-xl p-6 md:p-8 flex flex-col gap-4">
-                <p className="text-sm uppercase tracking-wide text-blue-100 font-semibold">Resumo rápido</p>
-                <h2 className="text-2xl font-bold leading-snug">Acesso garantido com supervisão de administrador verificado</h2>
+                <p className="text-sm uppercase tracking-wide text-blue-100 font-semibold">Resumo rapido</p>
+                <h2 className="text-2xl font-bold leading-snug">Acesso garantido com supervisao de administrador verificado</h2>
                 <p className="text-blue-100 text-sm">
-                  Confiança e segurança para entrar no grupo com suporte dedicado e acompanhamento na entrega do acesso.
+                  Confianca e seguranca para entrar no grupo com suporte dedicado e acompanhamento na entrega do acesso.
                 </p>
                 <div className="bg-white/15 rounded-xl p-4 flex items-center justify-between">
                   <div>
@@ -158,7 +170,7 @@ export default function GrupoDetalhe({ grupo }) {
                   </div>
                   <div className="text-right">
                     <p className="text-blue-100 text-sm">Plano</p>
-                    <p className="text-lg font-semibold">Google One 2 TB</p>
+                    <p className="text-lg font-semibold">{dados.subtitulo || 'Google One 2 TB'}</p>
                   </div>
                 </div>
               </div>
@@ -169,9 +181,9 @@ export default function GrupoDetalhe({ grupo }) {
                     <p className="text-sm text-gray-600">Mensalidade</p>
                     <p className="text-2xl font-bold text-gray-900">R$ {preco.toFixed(2)}</p>
                   </div>
-                  <Badge text="Hero CTA" variant="info" />
+                  <Badge text="CTA em destaque" variant="info" />
                 </div>
-                <p className="text-sm text-gray-700">Pagamento mensal, renovação automática e acompanhamento do acesso pelo administrador.</p>
+                <p className="text-sm text-gray-700">Pagamento mensal, renovacao automatica e acompanhamento do acesso pelo administrador.</p>
                 <Link
                   href={whatsappLink}
                   target="_blank"
@@ -188,9 +200,9 @@ export default function GrupoDetalhe({ grupo }) {
         <section className="px-4 pb-12">
           <div className="max-w-6xl mx-auto grid lg:grid-cols-[2fr_1fr] gap-8">
             <div className="space-y-6">
-              <CardSection title="Benefícios de participar">
+              <CardSection title="Beneficios de participar">
                 <div className="grid sm:grid-cols-2 gap-4">
-                  {DEFAULT_CONTENT.beneficios.map((item) => (
+                  {beneficios.map((item) => (
                     <div key={item} className="flex items-start gap-3 bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                       <span className="text-blue-600 mt-1">
                         <FaCheckCircle />
@@ -201,19 +213,19 @@ export default function GrupoDetalhe({ grupo }) {
                 </div>
               </CardSection>
 
-              <CardSection title="Preço e disponibilidade">
+              <CardSection title="Preco e disponibilidade">
                 <div className="grid md:grid-cols-3 gap-4">
-                  <InfoCard label="Preço" value={`R$ ${preco.toFixed(2)}/mês`} />
+                  <InfoCard label="Preco" value={`R$ ${preco.toFixed(2)}/mes`} />
                   <InfoCard label="Vagas restantes" value={`${vagasDisponiveis || 0} de ${capacidade}`} />
-                  <InfoCard label="Tipo de acesso" value="Convite" />
-                  <InfoCard label="Renovação" value="Anual do plano Google One" />
-                  <InfoCard label="Status" value={vagasDisponiveis > 0 ? 'Aberto' : 'Últimas vagas'} />
+                  <InfoCard label="Tipo de acesso" value={acesso} />
+                  <InfoCard label="Renovacao" value={dados.subtitulo || 'Anual do plano Google One'} />
+                  <InfoCard label="Status" value={vagasDisponiveis > 0 ? 'Aberto' : 'Ultimas vagas'} />
                 </div>
               </CardSection>
 
               <CardSection title="Fidelidade do grupo">
                 <ul className="list-disc pl-5 space-y-2 text-gray-700 text-sm">
-                  {DEFAULT_CONTENT.fidelidade.map((item) => (
+                  {fidelidade.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
@@ -221,7 +233,7 @@ export default function GrupoDetalhe({ grupo }) {
 
               <CardSection title="Regras do grupo">
                 <ol className="list-decimal pl-5 space-y-2 text-gray-800 text-sm">
-                  {DEFAULT_CONTENT.regras.map((regra) => (
+                  {regras.map((regra) => (
                     <li key={regra}>{regra}</li>
                   ))}
                 </ol>
@@ -229,7 +241,7 @@ export default function GrupoDetalhe({ grupo }) {
 
               <CardSection title="FAQ">
                 <div className="space-y-3">
-                  {DEFAULT_CONTENT.faq.map(({ pergunta, resposta }) => (
+                  {faq.map(({ pergunta, resposta }) => (
                     <details
                       key={pergunta}
                       className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 group open:shadow-md transition"
@@ -249,35 +261,39 @@ export default function GrupoDetalhe({ grupo }) {
               <CardSection title="Administrador">
                 <div className="flex items-center gap-4">
                   <Image
-                    src={DEFAULT_CONTENT.admin.avatar}
-                    alt={DEFAULT_CONTENT.admin.nome}
+                    src={adminAvatar}
+                    alt={adminNome}
                     width={72}
                     height={72}
                     className="rounded-full object-cover shadow"
                     unoptimized
                   />
                   <div>
-                    <p className="text-lg font-bold">{DEFAULT_CONTENT.admin.nome}</p>
-                    <p className="text-sm text-amber-600 font-semibold">Selo ouro</p>
+                    <p className="text-lg font-bold">{adminNome}</p>
+                    <p className="text-sm text-amber-600 font-semibold">{confiabilidade}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
-                  {DEFAULT_CONTENT.admin.selos.map((selo) => (
-                    <span
-                      key={selo.label}
-                      title={selo.label}
-                      className="inline-flex items-center gap-2 bg-blue-50 text-blue-800 text-xs font-semibold px-3 py-2 rounded-full"
-                    >
-                      <i className={`fa ${selo.icon}`} aria-hidden="true"></i>
-                      {selo.label}
-                    </span>
-                  ))}
+                  {adminSelos.map((selo, idx) => {
+                    const label = typeof selo === 'string' ? selo : selo.label;
+                    const icon = typeof selo === 'object' && selo.icon ? selo.icon : 'fa-circle-check';
+                    return (
+                      <span
+                        key={`${label}-${idx}`}
+                        title={label}
+                        className="inline-flex items-center gap-2 bg-blue-50 text-blue-800 text-xs font-semibold px-3 py-2 rounded-full"
+                      >
+                        <i className={`fa ${icon}`} aria-hidden="true"></i>
+                        {label}
+                      </span>
+                    );
+                  })}
                 </div>
               </CardSection>
 
               <CardSection title="Participantes">
                 <div className="flex flex-wrap gap-3">
-                  {DEFAULT_CONTENT.participantes.map((pessoa) => (
+                  {participantes.map((pessoa) => (
                     <div key={pessoa.nome} className="flex items-center gap-2 bg-white rounded-full border border-gray-100 shadow-sm px-3 py-2">
                       <Image
                         src={pessoa.avatar}
@@ -293,11 +309,11 @@ export default function GrupoDetalhe({ grupo }) {
                 </div>
               </CardSection>
 
-              <CardSection title="Outras informações">
+              <CardSection title="Outras informacoes">
                 <div className="space-y-2 text-sm text-gray-700">
-                  <p>Link oficial do serviço:</p>
-                  <Link href={DEFAULT_CONTENT.linkOficial} target="_blank" rel="noopener noreferrer" className="text-blue-700 font-semibold hover:underline break-all">
-                    {DEFAULT_CONTENT.linkOficial}
+                  <p>Link oficial do servico:</p>
+                  <Link href={linkOficial} target="_blank" rel="noopener noreferrer" className="text-blue-700 font-semibold hover:underline break-all">
+                    {linkOficial}
                   </Link>
                 </div>
               </CardSection>
@@ -310,7 +326,7 @@ export default function GrupoDetalhe({ grupo }) {
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
           <div>
             <p className="text-xs text-gray-600">Entrar no grupo</p>
-            <p className="text-lg font-bold text-gray-900">R$ {preco.toFixed(2)}/mês</p>
+            <p className="text-lg font-bold text-gray-900">R$ {preco.toFixed(2)}/mes</p>
           </div>
           <Link
             href={whatsappLink}
