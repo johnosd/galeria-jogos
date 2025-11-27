@@ -7,12 +7,21 @@ import FlowStepper from '../../components/FlowStepper';
 
 export default function Sucesso() {
   const router = useRouter();
-  const { grupoId, nome, preco } = router.query;
+  const { grupoId, nome, preco, userId: queryUserId } = router.query;
   const [registrado, setRegistrado] = useState(false);
+  const [userId, setUserId] = useState('');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const existing = queryUserId || localStorage.getItem('client-user-id');
+    const id = existing || `client-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
+    if (!existing) localStorage.setItem('client-user-id', id);
+    setUserId(id);
+  }, [queryUserId]);
 
   useEffect(() => {
     const registrar = async () => {
-      if (!grupoId) return;
+      if (!grupoId || !userId) return;
       const flag = `grupo-joined-${grupoId}`;
       if (typeof window !== 'undefined' && localStorage.getItem(flag)) {
         setRegistrado(true);
@@ -22,7 +31,7 @@ export default function Sucesso() {
         const res = await fetch(`/api/grupos/${grupoId}/join`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nomeParticipante: 'Novo membro' }),
+          body: JSON.stringify({ nomeParticipante: 'Novo membro', userId }),
         });
         if (res.ok && typeof window !== 'undefined') {
           localStorage.setItem(flag, '1');
@@ -34,7 +43,7 @@ export default function Sucesso() {
     };
 
     registrar();
-  }, [grupoId]);
+  }, [grupoId, userId]);
 
   return (
     <>

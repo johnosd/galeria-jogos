@@ -11,7 +11,7 @@ const METODOS = [
 
 export default function Pagamento() {
   const router = useRouter();
-  const { grupoId, nome, preco } = router.query;
+  const { grupoId, nome, preco, userId } = router.query;
   const [metodo, setMetodo] = useState('saldo');
   const [mostrarMetodosExtras, setMostrarMetodosExtras] = useState(false);
   const [mostrarCupom, setMostrarCupom] = useState(false);
@@ -25,9 +25,10 @@ export default function Pagamento() {
     if (grupoId) query.append('grupoId', grupoId);
     if (nome) query.append('nome', nome);
     if (precoNumero) query.append('preco', String(precoNumero));
+    if (userId) query.append('userId', userId);
     const qs = query.toString();
     return `/assinatura/sucesso${qs ? `?${qs}` : ''}`;
-  }, [grupoId, nome, precoNumero]);
+  }, [grupoId, nome, precoNumero, userId]);
 
   return (
     <>

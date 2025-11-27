@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FaWhatsapp, FaUsers, FaClock, FaShieldAlt, FaCrown, FaCheckCircle, FaExternalLinkAlt } from 'react-icons/fa';
 import Header from '../../components/Header';
 
@@ -59,6 +59,9 @@ function calcularStatusGrupo(grupo) {
 
 export default function GrupoDetalhe({ grupo }) {
   const dados = grupo || {};
+  const grupoId = dados._id || dados.id || '';
+  const [userId, setUserId] = useState('');
+  const [jaMembro, setJaMembro] = useState(false);
   const { capacidade, membrosAtivos, vagasDisponiveis } = useMemo(() => calcularStatusGrupo(dados), [dados]);
 
   const nome = dados.nome || DEFAULT_CONTENT.nome;
@@ -82,17 +85,42 @@ export default function GrupoDetalhe({ grupo }) {
     Array.isArray(dados.participantes) && dados.participantes.length
       ? dados.participantes.map((item, idx) =>
           typeof item === 'string'
-            ? { nome: item, avatar: `https://i.pravatar.cc/120?img=${(idx % 70) + 1}` }
-            : { nome: item?.nome || `Membro ${idx + 1}`, avatar: item?.avatar || `https://i.pravatar.cc/120?img=${(idx % 70) + 1}` }
+            ? { nome: item, avatar: `https://i.pravatar.cc/120?img=${(idx % 70) + 1}`, userId: undefined }
+            : {
+                nome: item?.nome || `Membro ${idx + 1}`,
+                avatar: item?.avatar || `https://i.pravatar.cc/120?img=${(idx % 70) + 1}`,
+                userId: item?.userId,
+              }
         )
       : DEFAULT_CONTENT.participantes;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const existing = localStorage.getItem('client-user-id');
+    const id = existing || `client-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
+    if (!existing) localStorage.setItem('client-user-id', id);
+    setUserId(id);
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    const found = participantes.some((p) => p?.userId && p.userId === userId);
+    const flag = grupoId ? localStorage.getItem(`grupo-joined-${grupoId}`) : null;
+    setJaMembro(Boolean(found || flag));
+  }, [userId, participantes, grupoId]);
 
   const whatsappLink = `https://wa.me/5511997383948?text=${encodeURIComponent(
     `Ola! Quero entrar no grupo de assinatura: ${nome}`
   )}`;
-  const flowQuery = `?grupoId=${dados._id || dados.id || ''}&nome=${encodeURIComponent(nome)}&preco=${encodeURIComponent(
-    preco
-  )}`;
+  const flowQuery = useMemo(() => {
+    const query = new URLSearchParams();
+    if (grupoId) query.append('grupoId', grupoId);
+    if (nome) query.append('nome', nome);
+    if (preco) query.append('preco', preco);
+    if (userId) query.append('userId', userId);
+    const qs = query.toString();
+    return qs ? `?${qs}` : '';
+  }, [grupoId, nome, preco, userId]);
 
   return (
     <>
@@ -188,10 +216,15 @@ export default function GrupoDetalhe({ grupo }) {
                 </div>
                 <p className="text-sm text-gray-700">Pagamento mensal, renovacao automatica e acompanhamento do acesso pelo administrador.</p>
                 <Link
-                  href={`/assinatura/relacionamento${flowQuery}`}
-                  className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition"
+                  href={jaMembro ? '#' : `/assinatura/relacionamento${flowQuery}`}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow transition ${
+                    jaMembro
+                      ? 'bg-gray-300 text-gray-600 cursor-not-allowed pointer-events-none'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                  aria-disabled={jaMembro}
                 >
-                  <FaWhatsapp /> Assinar
+                  <FaWhatsapp /> {jaMembro ? 'Voce ja participa' : 'Assinar'}
                 </Link>
               </div>
             </div>

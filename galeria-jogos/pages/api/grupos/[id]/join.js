@@ -30,12 +30,28 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Grupo completo' });
     }
 
-    const { nomeParticipante, avatarParticipante } = req.body || {};
+    const { nomeParticipante, avatarParticipante, userId } = req.body || {};
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId obrigatorio' });
+    }
+
+    const jaMembro =
+      Array.isArray(grupo.participantes) &&
+      grupo.participantes.some((p) => {
+        if (typeof p === 'object' && p?.userId) return p.userId === userId;
+        return false;
+      });
+
+    if (jaMembro) {
+      return res.status(200).json({ message: 'Usuario ja e membro', grupo });
+    }
     const participante =
       nomeParticipante || avatarParticipante
         ? {
             nome: nomeParticipante || 'Novo membro',
             avatar: avatarParticipante || '',
+            userId,
           }
         : null;
 
