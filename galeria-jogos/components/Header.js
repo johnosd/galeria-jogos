@@ -38,6 +38,15 @@ export default function Header({ admin = false }) {
             </Link>
           )}
 
+          {session && (
+            <Link
+              href="/admin/grupos/novo"
+              className="hidden sm:inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white font-semibold transition"
+            >
+              Criar Grupo
+            </Link>
+          )}
+
           <button
             onClick={() => setMenuAberto(!menuAberto)}
             className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded focus:outline-none"
@@ -52,12 +61,19 @@ export default function Header({ admin = false }) {
             <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded shadow-lg text-white z-[9999]">
               {session ? (
                 <>
-                  <Link
-                    href="/admin"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
-                  >
-                    Administracao
+              <Link
+                href="/meus-grupos"
+                className="block px-4 py-2 hover:bg-gray-600"
+                onClick={() => setMenuAberto(false)}
+              >
+                Meus Grupos
+              </Link>
+              <Link
+                href="/admin"
+                className="block px-4 py-2 hover:bg-gray-600"
+                onClick={() => setMenuAberto(false)}
+              >
+                Administracao
                   </Link>
                   <Link
                     href="/"
@@ -82,6 +98,13 @@ export default function Header({ admin = false }) {
                   >
                     Meu Perfil
                   </Link>
+                  <Link
+                    href="/meus-grupos"
+                    className="block px-4 py-2 hover:bg-gray-600"
+                    onClick={() => setMenuAberto(false)}
+                  >
+                    Meus Grupos
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="block px-4 py-2 w-full text-left hover:bg-gray-600"
@@ -104,6 +127,13 @@ export default function Header({ admin = false }) {
                     onClick={() => setMenuAberto(false)}
                   >
                     Pagina Inicial
+                  </Link>
+                  <Link
+                    href="/meus-grupos"
+                    className="block px-4 py-2 hover:bg-gray-600"
+                    onClick={() => setMenuAberto(false)}
+                  >
+                    Meus Grupos
                   </Link>
                 </>
               )}
