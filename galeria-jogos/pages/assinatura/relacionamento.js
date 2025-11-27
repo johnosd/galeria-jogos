@@ -1,10 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Header from '../../components/Header';
 import FlowStepper from '../../components/FlowStepper';
 
 export default function Relacionamento() {
+  const router = useRouter();
+  const { grupoId, nome, preco } = router.query;
   const [aceitou, setAceitou] = useState(false);
+  const hrefContinuar = useMemo(() => {
+    const query = new URLSearchParams();
+    if (grupoId) query.append('grupoId', grupoId);
+    if (nome) query.append('nome', nome);
+    if (preco) query.append('preco', preco);
+    const qs = query.toString();
+    return `/assinatura/pagamento${qs ? `?${qs}` : ''}`;
+  }, [grupoId, nome, preco]);
 
   return (
     <>
@@ -66,7 +77,7 @@ export default function Relacionamento() {
           <div className="space-y-2">
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/assinatura/pagamento"
+                href={hrefContinuar}
                 className={`flex-1 min-w-[180px] text-center px-5 py-3 rounded-xl font-semibold text-white transition shadow ${
                   aceitou
                     ? 'bg-blue-600 hover:bg-blue-700'

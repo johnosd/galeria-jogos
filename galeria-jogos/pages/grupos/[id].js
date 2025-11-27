@@ -90,6 +90,9 @@ export default function GrupoDetalhe({ grupo }) {
   const whatsappLink = `https://wa.me/5511997383948?text=${encodeURIComponent(
     `Ola! Quero entrar no grupo de assinatura: ${nome}`
   )}`;
+  const flowQuery = `?grupoId=${dados._id || dados.id || ''}&nome=${encodeURIComponent(nome)}&preco=${encodeURIComponent(
+    preco
+  )}`;
 
   return (
     <>
@@ -185,7 +188,7 @@ export default function GrupoDetalhe({ grupo }) {
                 </div>
                 <p className="text-sm text-gray-700">Pagamento mensal, renovacao automatica e acompanhamento do acesso pelo administrador.</p>
                 <Link
-                  href="/assinatura/relacionamento"
+                  href={`/assinatura/relacionamento${flowQuery}`}
                   className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition"
                 >
                   <FaWhatsapp /> Assinar

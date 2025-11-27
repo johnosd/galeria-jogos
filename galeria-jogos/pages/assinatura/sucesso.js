@@ -1,9 +1,41 @@
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { FaCheckCircle } from 'react-icons/fa';
 import Header from '../../components/Header';
 import FlowStepper from '../../components/FlowStepper';
 
 export default function Sucesso() {
+  const router = useRouter();
+  const { grupoId, nome, preco } = router.query;
+  const [registrado, setRegistrado] = useState(false);
+
+  useEffect(() => {
+    const registrar = async () => {
+      if (!grupoId) return;
+      const flag = `grupo-joined-${grupoId}`;
+      if (typeof window !== 'undefined' && localStorage.getItem(flag)) {
+        setRegistrado(true);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/grupos/${grupoId}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nomeParticipante: 'Novo membro' }),
+        });
+        if (res.ok && typeof window !== 'undefined') {
+          localStorage.setItem(flag, '1');
+          setRegistrado(true);
+        }
+      } catch (error) {
+        // Silencia o erro no front; pagina segue mostrando sucesso visual
+      }
+    };
+
+    registrar();
+  }, [grupoId]);
+
   return (
     <>
       <Header />
@@ -21,7 +53,7 @@ export default function Sucesso() {
             </div>
             <div className="space-y-1">
               <h1 className="text-2xl font-extrabold">Bem-vindo ao grupo!</h1>
-              <p className="text-gray-700">Voce agora faz parte do grupo de Rodrigo.</p>
+              <p className="text-gray-700">Voce agora faz parte do grupo de {nome || 'assinatura'}.</p>
             </div>
             <div className="space-y-2 text-gray-700 text-sm">
               <p>Enviamos uma notificacao ao administrador para liberar tudo certinho.</p>

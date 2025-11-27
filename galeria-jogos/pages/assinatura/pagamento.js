@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Header from '../../components/Header';
 import FlowStepper from '../../components/FlowStepper';
 
@@ -9,9 +10,24 @@ const METODOS = [
 ];
 
 export default function Pagamento() {
+  const router = useRouter();
+  const { grupoId, nome, preco } = router.query;
   const [metodo, setMetodo] = useState('saldo');
   const [mostrarMetodosExtras, setMostrarMetodosExtras] = useState(false);
   const [mostrarCupom, setMostrarCupom] = useState(false);
+  const grupoNome = nome || 'Grupo';
+  const precoNumero = useMemo(() => {
+    const n = Number(preco);
+    return Number.isFinite(n) && n > 0 ? n : 35;
+  }, [preco]);
+  const hrefSucesso = useMemo(() => {
+    const query = new URLSearchParams();
+    if (grupoId) query.append('grupoId', grupoId);
+    if (nome) query.append('nome', nome);
+    if (precoNumero) query.append('preco', String(precoNumero));
+    const qs = query.toString();
+    return `/assinatura/sucesso${qs ? `?${qs}` : ''}`;
+  }, [grupoId, nome, precoNumero]);
 
   return (
     <>
@@ -26,18 +42,18 @@ export default function Pagamento() {
           </div>
 
           <section className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 space-y-2">
-            <p className="text-xs uppercase tracking-wide text-gray-500">Resumo</p>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold">Google One</p>
-                <p className="text-sm text-gray-600">Inclui mensalidade + caucao. Sem taxas extras.</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Valor hoje</p>
-                <p className="text-xl font-bold">R$ 35,00</p>
-              </div>
-            </div>
-          </section>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Resumo</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-semibold">{grupoNome}</p>
+                    <p className="text-sm text-gray-600">Inclui mensalidade + caucao. Sem taxas extras.</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Valor hoje</p>
+                    <p className="text-xl font-bold">R$ {precoNumero.toFixed(2)}</p>
+                  </div>
+                </div>
+              </section>
 
           <section className="space-y-4">
             {METODOS.map((item) => (
@@ -138,11 +154,11 @@ export default function Pagamento() {
           <div className="bg-white border-t md:border border-gray-200 shadow-2xl md:shadow-sm px-4 py-4 md:rounded-2xl flex flex-col md:flex-row items-center md:items-stretch gap-3">
             <div className="flex-1 w-full">
               <p className="text-xs text-gray-500">Pagamento</p>
-              <p className="text-lg font-bold text-gray-900">R$ 35,00</p>
+              <p className="text-lg font-bold text-gray-900">R$ {precoNumero.toFixed(2)}</p>
               <p className="text-xs text-gray-600">Transacao segura criptografada.</p>
             </div>
             <Link
-              href="/assinatura/sucesso"
+              href={hrefSucesso}
               className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold shadow-lg hover:bg-blue-700 transition"
             >
               <i className="fa fa-lock" aria-hidden="true"></i>
