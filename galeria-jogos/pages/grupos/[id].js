@@ -2,6 +2,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { FaWhatsapp, FaUsers, FaClock, FaShieldAlt, FaCrown, FaCheckCircle, FaExternalLinkAlt } from 'react-icons/fa';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import Header from '../../components/Header';
 
 const DEFAULT_CONTENT = {

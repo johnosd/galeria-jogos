@@ -1,0 +1,63 @@
+{
+  "bsonType": "object",
+  "required": ["email", "codigo", "tipo", "expiresAt"],
+  "properties": {
+    "_id": { "bsonType": "objectId" },
+
+    "email": {
+      "bsonType": "string",
+      "description": "E-mail do usuário que receberá o código"
+    },
+
+    "codigo": {
+      "bsonType": "string",
+      "description": "Código de verificação enviado ao usuário"
+    },
+
+    "tipo": {
+      "enum": [
+        "validacao_cadastro",
+        "recuperacao_senha",
+        "2fa_saque",
+        "confirmacao_email",
+        "confirmacao_transacao"
+      ],
+      "description": "Tipo de fluxo que exige verificação"
+    },
+
+    "status": {
+      "enum": ["pendente", "usado", "expirado"],
+      "description": "Impede reuso do código"
+    },
+
+    "tentativas": {
+      "bsonType": "int",
+      "description": "Tentativas de validação, usado para anti brute-force"
+    },
+
+    "expiresAt": {
+      "bsonType": "date",
+      "description": "Data de expiração usada pelo Mongo TTL"
+    },
+
+    "createdAt": {
+      "bsonType": "date",
+      "description": "Data de criação do código"
+    },
+
+    "usedAt": {
+      "bsonType": ["date", "null"],
+      "description": "Quando o código foi usado"
+    },
+
+    "ipOrigem": {
+      "bsonType": ["string", "null"],
+      "description": "IP do usuário que solicitou o código"
+    },
+
+    "userAgent": {
+      "bsonType": ["string", "null"],
+      "description": "User-Agent coletado na geração do código"
+    }
+  }
+}
