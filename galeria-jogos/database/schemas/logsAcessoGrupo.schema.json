@@ -1,0 +1,26 @@
+{
+  "bsonType": "object",
+  "required": ["grupoId", "userId", "tipoEvento"],
+  "properties": {
+    "_id": { "bsonType": "objectId" },
+
+    "grupoId": { "bsonType": "objectId" },
+    "userId": { "bsonType": "objectId" },
+
+    "tipoEvento": {
+      "enum": [
+        "envio_acesso",
+        "confirmacao_acesso",
+        "alteracao_credencial",
+        "erro_login",
+        "bloqueio_conta",
+        "reativacao_conta",
+        "saida_membro"
+      ]
+    },
+
+    "descricao": { "bsonType": "string" },
+
+    "dataEvento": { "bsonType": "date" }
+  }
+}

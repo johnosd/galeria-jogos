@@ -1,0 +1,33 @@
+{
+  "bsonType": "object",
+  "required": ["userId", "tipo", "valor", "status", "dataCriacao"],
+  "properties": {
+    "_id": { "bsonType": "objectId" },
+    "userId": { "bsonType": "objectId" },
+    "grupoId": { "bsonType": ["objectId", "null"] },
+
+    "tipo": {
+      "enum": [
+        "deposito",
+        "compra_credito",
+        "mensalidade",
+        "repasse_admin",
+        "caucao",
+        "estorno_proporcional",
+        "estorno_total",
+        "saque",
+        "taxa"
+      ]
+    },
+
+    "valor": { "bsonType": "double" },
+    "taxa": { "bsonType": "double" },
+
+    "status": {
+      "enum": ["pendente", "processando", "concluido", "falhou"]
+    },
+
+    "dataCriacao": { "bsonType": "date" },
+    "dataConclusao": { "bsonType": ["date", "null"] }
+  }
+}

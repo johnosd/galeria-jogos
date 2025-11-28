@@ -65,6 +65,25 @@ async function run() {
     await db.collection("membrosGrupo").createIndex({ grupoId: 1, status: 1 });
     await db.collection("membrosGrupo").createIndex({ grupoId: 1, userId: 1 }, { unique: true });
 
+    // 4) Logs de acesso do grupo
+    const logsSchema = await loadSchema("logsAcessoGrupo.schema.json");
+    await createCollection("logsAcessoGrupo", logsSchema);
+    await db.collection("logsAcessoGrupo").createIndex({ grupoId: 1, dataEvento: -1 });
+    await db.collection("logsAcessoGrupo").createIndex({ userId: 1, dataEvento: -1 });
+
+    // 5) Transacoes
+    const transacoesSchema = await loadSchema("transacoes.schema.json");
+    await createCollection("transacoes", transacoesSchema);
+    await db.collection("transacoes").createIndex({ userId: 1, dataCriacao: -1 });
+    await db.collection("transacoes").createIndex({ grupoId: 1, dataCriacao: -1 });
+    await db.collection("transacoes").createIndex({ status: 1 });
+
+    // 6) Saques
+    const saquesSchema = await loadSchema("saques.schema.json");
+    await createCollection("saques", saquesSchema);
+    await db.collection("saques").createIndex({ userId: 1, dataSolicitacao: -1 });
+    await db.collection("saques").createIndex({ status: 1 });
+
     console.log("\nBanco configurado com sucesso!");
   } catch (error) {
     console.error("Erro:", error);

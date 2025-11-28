@@ -1,0 +1,26 @@
+{
+  "bsonType": "object",
+  "required": ["userId", "valorSolicitado", "valorLiquido", "metodo", "status", "dataSolicitacao"],
+  "properties": {
+    "_id": { "bsonType": "objectId" },
+    "userId": { "bsonType": "objectId" },
+
+    "valorSolicitado": { "bsonType": "double" },
+    "valorLiquido": { "bsonType": "double" },
+    "taxasAplicadas": { "bsonType": "double" },
+
+    "metodo": { "enum": ["pix", "ted", "boleto"] },
+    "chavePix": { "bsonType": ["string", "null"] },
+
+    "status": {
+      "enum": ["pendente", "revisando", "aguardando_2fa", "concluido", "cancelado", "rejeitado"]
+    },
+
+    "precisa2FA": { "bsonType": "bool" },
+    "codigoVerificacao": { "bsonType": ["string", "null"] },
+    "dataVerificacao": { "bsonType": ["date", "null"] },
+
+    "dataSolicitacao": { "bsonType": "date" },
+    "dataConclusao": { "bsonType": ["date", "null"] }
+  }
+}
