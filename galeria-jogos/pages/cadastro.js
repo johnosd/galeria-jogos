@@ -1,13 +1,14 @@
 // pages/cadastro.js
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useState } from "react";
 import { useRouter } from "next/router";
 
 export default function Cadastro() {
   const { data: session } = useSession();
   const router = useRouter();
 
-  const [nome, setNome] = useState(session?.user?.name || "");
+  const fullName = useMemo(() => session?.user?.name || "", [session?.user?.name]);
+  const [nome, setNome] = useState("");
   const [sobrenome, setSobrenome] = useState("");
   const [email] = useState(session?.user?.email || "");
   const [image] = useState(session?.user?.image || "");
@@ -16,22 +17,59 @@ export default function Cadastro() {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
 
+  useEffect(() => {
+    if (!fullName) return;
+    const [primeiro, ...restante] = fullName.trim().split(" ");
+    setNome((v) => (v ? v : primeiro || ""));
+    setSobrenome((v) => (v ? v : restante.join(" ") || ""));
+  }, [fullName]);
+
+  const validarCampos = () => {
+    const usernameLimpo = username.trim().toLowerCase();
+    const telefoneLimpo = telefone.replace(/\D/g, "");
+
+    if (!nome.trim() || !sobrenome.trim() || !email || !usernameLimpo) {
+      return "Nome, sobrenome e usuario sao obrigatorios.";
+    }
+
+    if (!/^[a-z0-9_.-]{3,20}$/i.test(usernameLimpo)) {
+      return "Usuario deve ter 3-20 caracteres (letras, numeros, . _ -).";
+    }
+
+    if (telefoneLimpo && telefoneLimpo.length < 10) {
+      return "Telefone invalido. Informe DDD + numero.";
+    }
+
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!nome || !sobrenome || !email || !username) {
-      setErro("Todos os campos são obrigatórios!");
+    const mensagemErro = validarCampos();
+    if (mensagemErro) {
+      setErro(mensagemErro);
       return;
     }
 
     setLoading(true);
+    setErro("");
+
+    const payload = {
+      nome: nome.trim(),
+      sobrenome: sobrenome.trim(),
+      email,
+      image,
+      telefone: telefone.replace(/\D/g, ""),
+      username: username.trim().toLowerCase(),
+    };
 
     const response = await fetch("/api/cadastro", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ nome, sobrenome, email, image, telefone, username }),
+      body: JSON.stringify(payload),
     });
 
     if (response.ok) {
@@ -47,11 +85,11 @@ export default function Cadastro() {
         router.push("/verificacao");
       } else {
         const verificationData = await verificationResponse.json();
-        setErro(verificationData.message || "Erro ao enviar o código de verificação");
+        setErro(verificationData.message || "Erro ao enviar o codigo de verificacao.");
       }
     } else {
       const data = await response.json();
-      setErro(data.message || "Erro ao cadastrar");
+      setErro(data.message || "Erro ao cadastrar.");
     }
     setLoading(false);
   };
@@ -59,8 +97,8 @@ export default function Cadastro() {
   return (
     <div className="min-h-screen flex justify-center items-center bg-gray-100">
       <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow max-w-md w-full">
-        <h2 className="text-xl font-bold mb-4">Cadastro de Usuário</h2>
-        <img src={image} alt="Imagem do usuário" className="w-20 h-20 rounded-full mx-auto mb-4" />
+        <h2 className="text-xl font-bold mb-4">Cadastro de Usuario</h2>
+        <img src={image} alt="Imagem do usuario" className="w-20 h-20 rounded-full mx-auto mb-4" />
 
         <input
           type="text"
@@ -88,7 +126,7 @@ export default function Cadastro() {
 
         <input
           type="text"
-          placeholder="Telefone"
+          placeholder="Telefone (DDD + numero)"
           value={telefone}
           onChange={(e) => setTelefone(e.target.value)}
           className="w-full p-3 mb-4 border rounded"
@@ -96,7 +134,7 @@ export default function Cadastro() {
 
         <input
           type="text"
-          placeholder="Nome de usuário"
+          placeholder="Nome de usuario"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className="w-full p-3 mb-4 border rounded"

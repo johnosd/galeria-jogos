@@ -1,5 +1,6 @@
+import Image from "next/image";
 import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import Header from "../components/Header";
 
@@ -16,6 +17,10 @@ export default function Perfil() {
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
+  const inicial = useMemo(
+    () => (nome?.[0] || session?.user?.name?.[0] || session?.user?.email?.[0] || "U").toUpperCase(),
+    [nome, session?.user]
+  );
 
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
@@ -45,7 +50,7 @@ export default function Perfil() {
 
       if (response.ok) {
         setMensagem("Perfil atualizado com sucesso!");
-        await update(); // Atualiza a sessão com os dados do MongoDB
+        await update(); // Atualiza a sessao com os dados do MongoDB
       } else {
         const data = await response.json();
         setErro(data.message || "Erro ao atualizar perfil.");
@@ -58,15 +63,27 @@ export default function Perfil() {
   };
 
   if (status === "loading") return <p>Carregando...</p>;
-  if (!session) return <p>Você precisa estar logado para acessar esta página.</p>;
+  if (!session) return <p>Voce precisa estar logado para acessar esta pagina.</p>;
 
   return (
     <>
       <Header />
       <div className="min-h-screen flex justify-center items-center bg-gray-100 p-4 pt-32">
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow max-w-md w-full">
-          <h2 className="text-xl font-bold mb-4">Perfil do Usuário</h2>
-          <img src={imagem} alt="Imagem do usuário" className="w-20 h-20 rounded-full mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-4">Perfil do Usuario</h2>
+          <div className="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-700">
+            {imagem ? (
+              <Image
+                src={imagem}
+                alt="Imagem do usuario"
+                width={96}
+                height={96}
+                className="w-24 h-24 object-cover"
+              />
+            ) : (
+              inicial
+            )}
+          </div>
 
           <input
             type="text"
@@ -102,7 +119,7 @@ export default function Perfil() {
 
           <input
             type="text"
-            placeholder="Nome de usuário"
+            placeholder="Nome de usuario"
             value={username}
             onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
             className="w-full p-3 mb-4 border rounded"
@@ -116,7 +133,7 @@ export default function Perfil() {
             className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
             disabled={loading}
           >
-            {loading ? "Salvando..." : "Salvar Alterações"}
+            {loading ? "Salvando..." : "Salvar Alteracoes"}
           </button>
         </form>
       </div>

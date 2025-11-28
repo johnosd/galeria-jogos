@@ -154,8 +154,18 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
             aria-expanded={menuAberto}
             aria-label="Abrir menu principal"
           >
-            <div className="h-9 w-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm">
-              {isAuthenticated ? userInitial : '?'}
+            <div className="h-9 w-9 rounded-full overflow-hidden bg-blue-600 text-white flex items-center justify-center font-semibold text-sm">
+              {isAuthenticated && session?.user?.image ? (
+                <Image
+                  src={session.user.image}
+                  alt="Foto do usuario"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 object-cover"
+                />
+              ) : (
+                userInitial
+              )}
             </div>
             <span className="relative block h-4 w-5" aria-hidden>
               <span
@@ -182,41 +192,39 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
               ref={menuRef}
               className="absolute right-0 mt-3 w-64 bg-gray-800 rounded-lg shadow-lg text-white z-[9999] py-2 border border-gray-700"
             >
-              <div className="px-4 pb-2 text-xs uppercase tracking-wide text-gray-400">Navegacao</div>
-              <Link
-                href="/"
-                className="block px-4 py-2 hover:bg-gray-700"
-                onClick={fecharMenu}
-              >
-                Inicio
-              </Link>
-              <Link
-                href="/meus-grupos"
-                className="block px-4 py-2 hover:bg-gray-700"
-                onClick={fecharMenu}
-              >
-                Meus grupos
-              </Link>
-              {isAuthenticated && (
-                <Link
-                  href="/admin/grupos/novo"
-                  className="block px-4 py-2 hover:bg-gray-700"
-                  onClick={fecharMenu}
-                >
-                  Criar grupo
-                </Link>
-              )}
-              <Link
-                href="/admin"
-                className="block px-4 py-2 hover:bg-gray-700"
-                onClick={fecharMenu}
-              >
-                Painel administrativo
-              </Link>
-
-              <div className="px-4 pt-3 pb-2 text-xs uppercase tracking-wide text-gray-400">Minha conta</div>
               {isAuthenticated ? (
                 <>
+                  <div className="px-4 pb-2 text-xs uppercase tracking-wide text-gray-400">Navegacao</div>
+                  <Link
+                    href="/"
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
+                  >
+                    Inicio
+                  </Link>
+                  <Link
+                    href="/meus-grupos"
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
+                  >
+                    Meus grupos
+                  </Link>
+                  <Link
+                    href="/admin/grupos/novo"
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
+                  >
+                    Criar grupo
+                  </Link>
+                  <Link
+                    href="/admin"
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
+                  >
+                    Painel administrativo
+                  </Link>
+
+                  <div className="px-4 pt-3 pb-2 text-xs uppercase tracking-wide text-gray-400">Minha conta</div>
                   {!session.user?.contaValidada && (
                     <Link
                       href="/verificacao"
