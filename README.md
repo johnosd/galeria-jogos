@@ -55,6 +55,14 @@ R2_PUBLIC_BASE_URL=https://pub-xxxx.r2.dev
 4) Opcional: ajuste a senha administrativa em `pages/admin/index.js` (const `SENHA`).
    - Aviso: senha fixa e compartilhada nao e segura em producao. Recomenda-se trocar por controle de acesso baseado no usuario autenticado (roles no Mongo + NextAuth) e remover a senha hardcoded.
 
+### Preparar o banco (schemas e indexes)
+Rodar o script de setup (usa `.env.local` para `MONGODB_URI` e `MONGODB_DB`):
+```bash
+cd galeria-jogos
+node database/setupDatabase.js
+```
+Ele cria/atualiza colecoes `grupos`, `users`, `membrosGrupo` com validacao de schema e indexes (slug unico, email/username unicos, relacoes grupoId/userId).
+
 ## Executar
 - Desenvolvimento: `npm run dev` e acesse http://localhost:3000
 - Producao local: `npm run build` seguido de `npm start`

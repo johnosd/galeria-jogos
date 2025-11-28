@@ -1,0 +1,86 @@
+{
+  "bsonType": "object",
+  "required": [
+    "tipoGrupo",
+    "nome",
+    "slug",
+    "valorTotal",
+    "valorPorVaga",
+    "status",
+    "capacidadeTotal"
+  ],
+  "properties": {
+    "_id": { "bsonType": "objectId" },
+
+    "tipoGrupo": {
+      "enum": ["publico", "privado", "pre_cadastrado"]
+    },
+
+    "nome": { "bsonType": "string" },
+    "slug": { "bsonType": "string" },
+    "subtitulo": { "bsonType": "string" },
+    "descricao": { "bsonType": "string" },
+
+    "capa": { "bsonType": "string" },
+    "imageUrl": { "bsonType": "string" },
+    "imageKey": { "bsonType": "string" },
+
+    "valorTotal": { "bsonType": "double" },
+    "valorPorVaga": { "bsonType": "double" },
+
+    "servicoPreAssinado": { "bsonType": "bool" },
+    "envioAutomaticoAcesso": { "bsonType": "bool" },
+
+    "capacidadeTotal": { "bsonType": "int" },
+    "vagasReservadasAdmin": { "bsonType": "int" },
+    "vagasDisponiveis": { "bsonType": "int" },
+
+    "acesso": { "enum": ["imediato", "apos_completar"] },
+    "tempoEntrega": { "bsonType": "string" },
+
+    "beneficios": {
+      "bsonType": "array",
+      "items": { "bsonType": "string" }
+    },
+
+    "regras": {
+      "bsonType": "array",
+      "items": { "bsonType": "string" }
+    },
+
+    "faq": {
+      "bsonType": "array",
+      "items": {
+        "bsonType": "object",
+        "required": ["pergunta", "resposta"],
+        "properties": {
+          "pergunta": { "bsonType": "string" },
+          "resposta": { "bsonType": "string" }
+        }
+      }
+    },
+
+    "linkOficial": { "bsonType": "string" },
+
+    "status": { "enum": ["ativo", "inativo"] },
+
+    "statusDetalhado": {
+      "enum": [
+        "em_formacao",
+        "aguardando_acesso",
+        "ativo",
+        "bloqueado",
+        "finalizado"
+      ]
+    },
+
+    "filaEsperaAtiva": { "bsonType": "bool" },
+    "dataAtivacao": { "bsonType": ["date", "null"] },
+
+    "necessitaAnalise": { "bsonType": "bool" },
+    "observacoesInternas": { "bsonType": ["string", "null"] },
+
+    "createdAt": { "bsonType": "date" },
+    "updatedAt": { "bsonType": "date" }
+  }
+}
