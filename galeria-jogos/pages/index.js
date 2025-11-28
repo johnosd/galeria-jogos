@@ -26,18 +26,7 @@ export default function Home({ gruposIniciais }) {
 
   return (
     <>
-      <Header />
-
-      <div className="max-w-md mx-auto mt-[110px] mb-10 px-4">
-        <input
-          type="text"
-          placeholder="Buscar grupo..."
-          value={busca}
-          autoFocus
-          onChange={(e) => setBusca(e.target.value)}
-          className="w-full px-5 py-3 rounded-lg border border-gray-300 shadow focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-        />
-      </div>
+      <Header valorBusca={busca} onBuscar={setBusca} />
 
       <main className="min-h-screen bg-gray-100 text-gray-900 px-4 py-8">
         <h1 className="text-3xl font-bold text-center mb-8">CCPLAY GRUPOS</h1>

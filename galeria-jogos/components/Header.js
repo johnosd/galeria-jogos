@@ -1,21 +1,54 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 
-export default function Header({ admin = false }) {
+export default function Header({ admin = false, valorBusca = '', onBuscar = () => {} }) {
   const [menuAberto, setMenuAberto] = useState(false);
   const { data: session, status } = useSession();
+  const menuRef = useRef(null);
+  const botaoMenuRef = useRef(null);
+  const isLoadingSession = status === 'loading';
+  const isAuthenticated = status === 'authenticated' && !!session;
+  const userInitial = session?.user?.name?.[0]?.toUpperCase() || 'U';
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/' });
   };
 
+  const fecharMenu = () => {
+    setMenuAberto(false);
+    botaoMenuRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (!menuAberto) return;
+
+    const handleClickFora = (event) => {
+      const clickForaMenu =
+        menuRef.current && !menuRef.current.contains(event.target) && !botaoMenuRef.current?.contains(event.target);
+
+      if (menuAberto && clickForaMenu) fecharMenu();
+    };
+
+    const handleEsc = (event) => {
+      if (event.key === 'Escape') fecharMenu();
+    };
+
+    document.addEventListener('mousedown', handleClickFora);
+    document.addEventListener('keydown', handleEsc);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickFora);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [menuAberto]);
+
   return (
     <header
       className={`${
         admin ? 'bg-gray-900' : 'bg-black'
-      } text-white px-6 flex items-center h-[100px] fixed top-0 left-0 right-0 z-50 shadow-md`}
+      } text-white px-6 flex items-center h-20 sm:h-24 fixed top-0 left-0 right-0 z-50 shadow-md`}
     >
       <div className="relative w-full max-w-7xl mx-auto flex justify-between items-center h-full">
         <Link href="/">
@@ -24,12 +57,41 @@ export default function Header({ admin = false }) {
             alt="Logo do Site"
             width={354}
             height={99}
-            className="object-cover cursor-pointer"
+            className="object-contain cursor-pointer w-36 sm:w-48 md:w-56 h-auto"
           />
         </Link>
 
+        <form
+          className="hidden sm:flex items-center flex-1 max-w-xl mx-6 bg-gray-800 border border-gray-700 rounded-full px-4 py-2"
+          role="search"
+          onSubmit={(e) => e.preventDefault()}
+        >
+          <svg
+            className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="search"
+            name="search"
+            value={valorBusca}
+            onChange={(e) => onBuscar(e.target.value)}
+            placeholder="Buscar jogos ou grupos"
+            className="bg-transparent w-full placeholder:text-gray-400 focus:outline-none text-sm"
+            aria-label="Buscar jogos ou grupos"
+          />
+        </form>
+
         <div className="flex items-center gap-3 ml-auto relative">
-          {status !== 'loading' && !session && (
+          {!isLoadingSession && !isAuthenticated && (
             <Link
               href="/auth/signin"
               className="hidden sm:inline-block bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white transition"
@@ -40,12 +102,13 @@ export default function Header({ admin = false }) {
 
           <Link
             href="/admin"
+            aria-label="Ir para o painel administrativo"
             className="hidden sm:inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white font-semibold transition"
           >
-            ADM
+            Painel administrativo
           </Link>
 
-          {session && (
+          {isAuthenticated && (
             <Link
               href="/admin/grupos/novo"
               className="hidden sm:inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white font-semibold transition"
@@ -55,101 +118,144 @@ export default function Header({ admin = false }) {
           )}
 
           <button
+            type="button"
+            className="hidden sm:flex items-center justify-center h-10 w-10 rounded-full bg-gray-800 border border-gray-700 hover:bg-gray-700 transition"
+            aria-label="Ver notificacoes"
+          >
+            <span className="relative">
+              <svg
+                className="h-5 w-5 text-white"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500" aria-hidden />
+            </span>
+          </button>
+
+          {isLoadingSession && (
+            <div className="hidden sm:block h-10 w-24 rounded bg-gray-800/70 animate-pulse" aria-hidden />
+          )}
+
+          <button
             onClick={() => setMenuAberto(!menuAberto)}
-            className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded focus:outline-none"
+            ref={botaoMenuRef}
+            className={`flex items-center gap-3 px-4 py-2 rounded focus:outline-none border border-gray-700 transition ${
+              menuAberto ? 'bg-gray-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-white'
+            }`}
             aria-haspopup="true"
             aria-expanded={menuAberto}
-            aria-label="Abrir menu"
+            aria-label="Abrir menu principal"
           >
-            Menu
+            <div className="h-9 w-9 rounded-full overflow-hidden bg-blue-600 text-white flex items-center justify-center font-semibold text-sm">
+              {isAuthenticated && session?.user?.image ? (
+                <Image
+                  src={session.user.image}
+                  alt="Foto do usuario"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 object-cover"
+                />
+              ) : (
+                userInitial
+              )}
+            </div>
+            <span className="relative block h-4 w-5" aria-hidden>
+              <span
+                className={`absolute left-0 top-0 h-[2px] w-5 bg-current transition ${
+                  menuAberto ? 'rotate-45 translate-y-[7px]' : ''
+                }`}
+              />
+              <span
+                className={`absolute left-0 top-1/2 h-[2px] w-5 bg-current transition ${
+                  menuAberto ? 'opacity-0' : ''
+                }`}
+              />
+              <span
+                className={`absolute left-0 bottom-0 h-[2px] w-5 bg-current transition ${
+                  menuAberto ? '-rotate-45 -translate-y-[7px]' : ''
+                }`}
+              />
+            </span>
+            <span className="text-sm font-semibold">{menuAberto ? 'Fechar' : 'Menu'}</span>
           </button>
 
           {menuAberto && (
-            <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded shadow-lg text-white z-[9999]">
-              {session ? (
+            <div
+              ref={menuRef}
+              className="absolute right-0 mt-3 w-64 bg-gray-800 rounded-lg shadow-lg text-white z-[9999] py-2 border border-gray-700"
+            >
+              {isAuthenticated ? (
                 <>
+                  <div className="px-4 pb-2 text-xs uppercase tracking-wide text-gray-400">Navegacao</div>
+                  <Link
+                    href="/"
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
+                  >
+                    Inicio
+                  </Link>
                   <Link
                     href="/meus-grupos"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
                   >
-                    Meus Grupos
+                    Meus grupos
+                  </Link>
+                  <Link
+                    href="/admin/grupos/novo"
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
+                  >
+                    Criar grupo
                   </Link>
                   <Link
                     href="/admin"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
                   >
-                    Administracao
+                    Painel administrativo
                   </Link>
-                  <Link
-                    href="/"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
-                  >
-                    Pagina Inicial
-                  </Link>
+
+                  <div className="px-4 pt-3 pb-2 text-xs uppercase tracking-wide text-gray-400">Minha conta</div>
                   {!session.user?.contaValidada && (
                     <Link
                       href="/verificacao"
-                      className="block px-4 py-2 hover:bg-gray-600"
-                      onClick={() => setMenuAberto(false)}
+                      className="block px-4 py-2 hover:bg-gray-700"
+                      onClick={fecharMenu}
                     >
-                      Verificar Conta
+                      Verificar conta
                     </Link>
                   )}
                   <Link
                     href="/perfil"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
                   >
-                    Meu Perfil
-                  </Link>
-                  <Link
-                    href="/meus-grupos"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
-                  >
-                    Meus Grupos
+                    Meu perfil
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    className="block px-4 py-2 w-full text-left hover:bg-gray-600"
+                    className="block px-4 py-2 w-full text-left hover:bg-gray-700"
                   >
                     Sair
                   </button>
                 </>
               ) : (
-                <>
-                  <Link
-                    href="/auth/signin"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
-                  >
-                    Entrar
-                  </Link>
-                  <Link
-                    href="/"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
-                  >
-                    Pagina Inicial
-                  </Link>
-                  <Link
-                    href="/admin"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
-                  >
-                    Administracao
-                  </Link>
-                  <Link
-                    href="/meus-grupos"
-                    className="block px-4 py-2 hover:bg-gray-600"
-                    onClick={() => setMenuAberto(false)}
-                  >
-                    Meus Grupos
-                  </Link>
-                </>
+                <Link
+                  href="/auth/signin"
+                  className="block px-4 py-2 hover:bg-gray-700"
+                  onClick={fecharMenu}
+                >
+                  Entrar
+                </Link>
               )}
             </div>
           )}
