@@ -1,80 +1,53 @@
-
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../../components/Header';
 
-const locked = true; // campos nao editaveis apos criacao
+const inputBaseClass = 'w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition';
+const labelClass = 'text-sm font-semibold text-gray-800 flex items-center gap-2';
+const sectionClass = 'bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100 space-y-4';
+const errorClass = 'text-xs text-red-600 mt-1';
+const helperClass = 'text-xs text-gray-500 mt-1';
 
-const DEFAULT_BENEFICIOS = [
-  'Armazenamento 2 TB compartilhado',
-  'Contas individuais preservam privacidade',
-  'Pagamento mensal',
-  'Grupo ja esta ativo',
-  'Administrador confiavel',
-  'Envio de acesso rapido',
-];
-
-const DEFAULT_REGRAS = ['Nao compartilhar senha', 'Nao postar em nome do administrador', 'Nao alterar senha'];
-const DEFAULT_FAQ = [
-  { pergunta: 'Quando terei acesso ao servico?', resposta: 'O acesso e enviado em ate 5 dias, normalmente no mesmo dia.' },
-  { pergunta: 'Quais formas de pagamento?', resposta: 'Pix ou cartao pelos metodos do administrador do grupo.' },
-  { pergunta: 'O que e caucao?', resposta: 'Valor de seguranca em casos especificos; avisaremos antes se for necessario.' },
-  { pergunta: 'Com quem posso dividir assinaturas?', resposta: 'Apenas com membros aprovados pelo administrador do grupo.' },
-];
-const DEFAULT_SELOS = ['Mais de 1 grupo ativo', '+1 ano de plataforma', 'Envio rapido'];
-const DEFAULT_PARTICIPANTES = ['Deyves', 'Luciene', 'Rafael', 'Nicholas'];
-
-const parseList = (value, fallback = []) => {
-  if (Array.isArray(value)) return value;
-  if (typeof value === 'string') return value.split('\n').map((i) => i.trim()).filter(Boolean);
+const parseLista = (valor, fallback = []) => {
+  if (Array.isArray(valor)) return valor;
+  if (typeof valor === 'string') {
+    return valor
+      .split(/\r?\n/)
+      .map((i) => i.trim())
+      .filter(Boolean);
+  }
   return fallback;
 };
 
-const parseFaq = (value) => {
-  if (Array.isArray(value)) return value.map((i) => ({ pergunta: i.pergunta || '', resposta: i.resposta || '' }));
-  if (typeof value === 'string') {
-    return value
-      .split('\n')
-      .map((line) => line.split('|'))
-      .filter((parts) => parts[0])
-      .map(([pergunta, resposta]) => ({ pergunta: (pergunta || '').trim(), resposta: (resposta || '').trim() }));
+const parseFaq = (valor) => {
+  if (Array.isArray(valor)) {
+    return valor.map((item) => ({
+      pergunta: item.pergunta || '',
+      resposta: item.resposta || '',
+    }));
   }
-  return DEFAULT_FAQ;
+  return [];
 };
 
-const parseFidelidade = (value) => {
-  const text = Array.isArray(value) ? value.join('\n') : value || '';
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  let periodo = '';
-  let renovacao = true;
-  let observacoes = '';
-  lines.forEach((line) => {
-    const lower = line.toLowerCase();
-    if (lower.includes('periodo')) {
-      const parts = line.split(':');
-      periodo = parts.slice(1).join(':').trim() || line.replace(/periodo/i, '').trim();
-    } else if (lower.includes('sem renovacao')) {
-      renovacao = false;
-    } else if (lower.includes('renovacao')) {
-      renovacao = true;
-    } else {
-      observacoes = observacoes ? `${observacoes}\n${line}` : line;
-    }
-  });
-  if (!periodo) periodo = '12 meses';
-  return { periodo, renovacao, observacoes };
+const parseFidelidade = (valor) => {
+  if (valor && typeof valor === 'object') {
+    return {
+      periodo: valor.periodoMeses ? `${valor.periodoMeses} meses` : '12 meses',
+      renovacao: valor.renovacaoAutomatica !== false,
+      observacoes: valor.observacoes || '',
+    };
+  }
+  return { periodo: '12 meses', renovacao: true, observacoes: '' };
 };
 
-const toParticipantes = (value) => {
-  const nomes = parseList(value, DEFAULT_PARTICIPANTES);
-  return nomes.map((nome) => ({
-    nome,
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}`,
-  }));
-};
 export default function EditarGrupo({ grupo }) {
   const router = useRouter();
   const fileInputRef = useRef(null);
+  const adminNomeExibicao = grupo.adminNome || grupo.admin?.nome || 'Administrador';
+  const adminAvatarExibicao = grupo.adminAvatar || grupo.admin?.avatar || '';
+  const adminEmailExibicao = grupo.adminEmail || grupo.admin?.email || '';
+  const adminIdExibicao = grupo.adminIdString || grupo.adminId || '';
+  const adminInitial = (adminNomeExibicao?.[0] || 'A').toUpperCase();
 
   const [nome, setNome] = useState(grupo.nome || '');
   const [capa, setCapa] = useState(grupo.imageUrl || grupo.capa || '');
@@ -85,24 +58,20 @@ export default function EditarGrupo({ grupo }) {
   const [preco, setPreco] = useState(grupo.preco || '');
   const [descricao, setDescricao] = useState(grupo.descricao || '');
   const [capacidadeTotal, setCapacidadeTotal] = useState(grupo.capacidadeTotal ?? '');
-  const [membrosAtivos, setMembrosAtivos] = useState(grupo.membrosAtivos ?? '');
-  const [pedidosSaida, setPedidosSaida] = useState(grupo.pedidosSaida ?? '');
+  const [membrosAtivos] = useState(1); // fixo
+  const [pedidosSaida] = useState(grupo.pedidosSaida ?? 0);
   const [subtitulo, setSubtitulo] = useState(grupo.subtitulo || '');
   const [acesso, setAcesso] = useState(grupo.acesso || 'Convite');
   const [tempoEntrega, setTempoEntrega] = useState(grupo.tempoEntrega || 'Ate 5 dias (geralmente mais rapido)');
-  const [confiabilidade, setConfiabilidade] = useState(grupo.confiabilidade || 'Selo ouro');
-  const [beneficios, setBeneficios] = useState(parseList(grupo.beneficios, DEFAULT_BENEFICIOS));
+  const [confiabilidade] = useState(grupo.confiabilidade || 'Selo ouro');
+  const [beneficios, setBeneficios] = useState(parseLista(grupo.beneficios, []));
   const fidelidadeParsed = parseFidelidade(grupo.fidelidade);
   const [fidelidadePeriodo, setFidelidadePeriodo] = useState(fidelidadeParsed.periodo);
   const [fidelidadeRenovacao, setFidelidadeRenovacao] = useState(fidelidadeParsed.renovacao);
   const [fidelidadeObservacoes, setFidelidadeObservacoes] = useState(fidelidadeParsed.observacoes);
-  const [regras, setRegras] = useState(parseList(grupo.regras, DEFAULT_REGRAS));
+  const [regras, setRegras] = useState(parseLista(grupo.regras, []));
   const [faq, setFaq] = useState(parseFaq(grupo.faq));
-  const [linkOficial, setLinkOficial] = useState(grupo.linkOficial || 'https://one.google.com/');
-  const [adminNome, setAdminNome] = useState(grupo.admin?.nome || 'Isabela');
-  const [adminAvatar, setAdminAvatar] = useState(grupo.admin?.avatar || 'https://i.pravatar.cc/160?img=47');
-  const [adminSelos, setAdminSelos] = useState(parseList(grupo.admin?.selos, DEFAULT_SELOS));
-  const [participantes, setParticipantes] = useState(toParticipantes(grupo.participantes));
+  const [linkOficial, setLinkOficial] = useState(grupo.linkOficial || '');
   const [msg, setMsg] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -119,80 +88,15 @@ export default function EditarGrupo({ grupo }) {
   const validateForm = () => {
     const novoErrors = {};
     if (!nome.trim()) novoErrors.nome = 'Nome e obrigatorio.';
-    if (preco === '' || Number.isNaN(Number(preco))) novoErrors.preco = 'Informe apenas numeros.';
+    if (!preco || Number.isNaN(Number(preco))) novoErrors.preco = 'Informe um preco valido.';
     const cap = Number(capacidadeTotal);
-    const ativos = Number(membrosAtivos);
     if (Number.isNaN(cap)) novoErrors.capacidadeTotal = 'Capacidade deve ser numero.';
-    if (Number.isNaN(ativos)) novoErrors.membrosAtivos = 'Membros ativos deve ser numero.';
-    if (!Number.isNaN(cap) && !Number.isNaN(ativos) && cap < ativos) novoErrors.membrosAtivos = 'Ativos nao podem exceder a capacidade.';
     if (!linkOficial || !validarUrl(linkOficial)) novoErrors.linkOficial = 'Informe uma URL valida (http/https).';
-    const beneficiosValidos = beneficios.some((b) => b.trim());
-    if (!beneficiosValidos) novoErrors.beneficios = 'Adicione pelo menos 1 beneficio.';
-    const regrasValidas = regras.some((r) => r.trim());
-    if (!regrasValidas) novoErrors.regras = 'Adicione pelo menos 1 regra.';
-    const adminSelosValidos = adminSelos.some((s) => s.trim());
-    if (!adminSelosValidos) novoErrors.adminSelos = 'Adicione pelo menos 1 selo.';
-    const participantesValidos = participantes.some((p) => p.nome.trim());
-    if (!participantesValidos) novoErrors.participantes = 'Adicione pelo menos 1 participante.';
-    if (!faq.length || faq.some((item) => !item.pergunta.trim() || !item.resposta.trim())) novoErrors.faq = 'Preencha pergunta e resposta.';
-    if (imagemFile && imagemFile.size > 5 * 1024 * 1024) novoErrors.imagem = 'Imagem deve ter ate 5MB.';
-    if (imagemFile && !['image/png', 'image/jpeg', 'image/webp'].includes(imagemFile.type)) novoErrors.imagem = 'Use JPG, PNG ou WebP.';
-    if (!adminNome.trim()) novoErrors.adminNome = 'Nome do admin e obrigatorio.';
-    if (adminAvatar && !validarUrl(adminAvatar)) novoErrors.adminAvatar = 'Avatar deve ser URL valida.';
-    if (!descricao.trim()) novoErrors.descricao = 'Descricao e obrigatoria.';
-    if (!subtitulo.trim()) novoErrors.subtitulo = 'Subtitulo e obrigatorio.';
+    if (!beneficios.length) novoErrors.beneficios = 'Adicione pelo menos 1 beneficio.';
+    if (!regras.length) novoErrors.regras = 'Adicione pelo menos 1 regra.';
+    if (!faq.length || faq.some((i) => !i.pergunta.trim() || !i.resposta.trim())) novoErrors.faq = 'FAQ precisa de pergunta e resposta.';
     setErrors(novoErrors);
     return Object.keys(novoErrors).length === 0;
-  };
-  const handleUploadImagem = async (file) => {
-    const selecionado = file || imagemFile;
-    if (!selecionado) {
-      setMsg('Selecione uma imagem antes de enviar.');
-      return;
-    }
-    setUploadingImg(true);
-    setMsg('');
-    const formData = new FormData();
-    formData.append('groupId', grupo._id);
-    formData.append('file', selecionado);
-    try {
-      const res = await fetch('/api/upload/group-image', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Erro ao enviar imagem');
-      setCapa(data.url);
-      setImagemPreview(data.url);
-      if (data.key) setImageKey(data.key);
-      setSucesso('Imagem atualizada com sucesso!');
-    } catch (error) {
-      setMsg(error.message || 'Erro ao enviar imagem');
-    } finally {
-      setUploadingImg(false);
-    }
-  };
-
-  const handleRemoverImagem = async () => {
-    setUploadingImg(true);
-    setMsg('');
-    try {
-      const res = await fetch('/api/upload/remove-group-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupId: grupo._id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Erro ao remover imagem');
-      setCapa('');
-      setImagemPreview('');
-      setImageKey('');
-      setSucesso('Imagem removida.');
-    } catch (error) {
-      setMsg(error.message || 'Erro ao remover imagem');
-    } finally {
-      setUploadingImg(false);
-    }
   };
 
   const handleFileSelect = (file) => {
@@ -208,89 +112,14 @@ export default function EditarGrupo({ grupo }) {
     setErrors((prev) => ({ ...prev, imagem: undefined }));
     setImagemFile(file);
     setImagemPreview(URL.createObjectURL(file));
-    handleUploadImagem(file);
-  };
-
-  const handleAtualizar = async (e) => {
-    e.preventDefault();
-    setMsg('');
-    setSucesso('');
-    const valido = validateForm();
-    if (!valido) return;
-    setSalvando(true);
-
-    const beneficiosText = beneficios.map((b) => b.trim()).filter(Boolean).join('\n');
-    const fidelidadeText = [
-      fidelidadePeriodo ? `Periodo: ${fidelidadePeriodo}` : '',
-      fidelidadeRenovacao ? 'Renovacao automatica' : 'Sem renovacao automatica',
-      fidelidadeObservacoes.trim(),
-    ]
-      .filter(Boolean)
-      .join('\n');
-    const regrasText = regras.map((r) => r.trim()).filter(Boolean).join('\n');
-    const faqText = faq
-      .filter((f) => f.pergunta.trim() && f.resposta.trim())
-      .map((f) => `${f.pergunta.trim()}|${f.resposta.trim()}`)
-      .join('\n');
-    const participantesText = participantes.map((p) => p.nome.trim()).filter(Boolean).join('\n');
-    const adminSelosText = adminSelos.map((s) => s.trim()).filter(Boolean).join('\n');
-
-    const payload = {
-      nome,
-      capa,
-      preco: parseFloat(preco),
-      descricao,
-      capacidadeTotal: Number(capacidadeTotal) || 0,
-      membrosAtivos: Number(membrosAtivos) || 0,
-      pedidosSaida: Number(pedidosSaida) || 0,
-      imageUrl: capa,
-      imageKey,
-      subtitulo,
-      acesso,
-      tempoEntrega,
-      confiabilidade,
-      beneficios: beneficiosText,
-      fidelidade: fidelidadeText,
-      regras: regrasText,
-      faq: faqText,
-      linkOficial,
-      adminNome,
-      adminAvatar,
-      adminSelos: adminSelosText,
-      participantes: participantesText,
-    };
-
-    try {
-      const res = await fetch(`/api/grupos/${grupo._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error('Erro ao atualizar grupo');
-
-      setSucesso('Grupo atualizado com sucesso!');
-      setTimeout(() => router.push('/admin/grupos'), 1500);
-    } catch (error) {
-      setMsg(error.message || 'Erro ao atualizar grupo');
-    } finally {
-      setSalvando(false);
-      setUploadingImg(false);
-    }
   };
 
   const adicionarItem = (setter, lista, valor) => {
-    if (valor === '') {
-      setter([...lista, '']);
-      return;
-    }
     if (!valor.trim()) return;
     setter([...lista, valor.trim()]);
   };
 
-  const removerItem = (setter, lista, index) => {
-    setter(lista.filter((_, i) => i !== index));
-  };
+  const removerItem = (setter, lista, index) => setter(lista.filter((_, i) => i !== index));
 
   const atualizarFaq = (index, campo, valor) => {
     setFaq((prev) => prev.map((item, i) => (i === index ? { ...item, [campo]: valor } : item)));
@@ -299,38 +128,69 @@ export default function EditarGrupo({ grupo }) {
   const adicionarFaq = () => setFaq([...faq, { pergunta: '', resposta: '' }]);
   const removerFaq = (index) => setFaq(faq.filter((_, i) => i !== index));
 
-  const adicionarParticipante = (nomeNovo) => {
-    if (!nomeNovo.trim()) return;
-    setParticipantes([
-      ...participantes,
-      { nome: nomeNovo.trim(), avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(nomeNovo.trim())}` },
-    ]);
+  const handleSalvar = async (e) => {
+    e.preventDefault();
+    setMsg('');
+    setSucesso('');
+    if (!validateForm()) return;
+    setSalvando(true);
+
+    const payload = {
+      nome,
+      capa,
+      imageUrl: capa,
+      imageKey,
+      preco: parseFloat(preco),
+      descricao,
+      capacidadeTotal: Number(capacidadeTotal) || 0,
+      membrosAtivos: 1,
+      pedidosSaida: Number(pedidosSaida) || 0,
+      subtitulo,
+      acesso,
+      tempoEntrega,
+      confiabilidade,
+      beneficios,
+      fidelidadePeriodo,
+      fidelidadeRenovacao,
+      fidelidadeObservacoes,
+      regras,
+      faq,
+      linkOficial,
+      adminId: grupo.adminIdString || grupo.adminId || '',
+      adminEmail: grupo.adminEmail || '',
+      adminNome: grupo.adminNome || grupo.admin?.nome || '',
+      adminAvatar: grupo.adminAvatar || grupo.admin?.avatar || '',
+      participantesIds: grupo.participantesIds || [],
+      status: grupo.status || 'ativo',
+    };
+
+    try {
+      const res = await fetch(`/api/grupos/${grupo._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Erro ao salvar grupo.');
+      setSucesso('Grupo atualizado com sucesso!');
+      setTimeout(() => router.push('/admin/grupos'), 1200);
+    } catch (error) {
+      setMsg(error.message || 'Erro ao salvar grupo.');
+    }
+    setSalvando(false);
   };
 
-  const removerParticipante = (index) => setParticipantes(participantes.filter((_, i) => i !== index));
-
-  const inputBaseClass = 'w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition';
-  const labelClass = 'text-sm font-semibold text-gray-800 flex items-center gap-2';
-  const sectionClass = 'bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100 space-y-4';
-  const errorClass = 'text-xs text-red-600 mt-1';
-  const helperClass = 'text-xs text-gray-500 mt-1';
   return (
     <>
       <Header admin />
-
       <main className="pt-[100px] min-h-screen bg-gray-50">
         <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
           <header className="flex flex-col gap-2">
             <h1 className="text-2xl font-bold text-gray-900">Editar grupo</h1>
-            <p className="text-gray-600">Atualize os dados do grupo. Campos com * sao obrigatorios.</p>
           </header>
 
-          <form onSubmit={handleAtualizar} className="space-y-6" aria-label="Formulario de edicao de grupo">
+          <form onSubmit={handleSalvar} className="space-y-6">
             <section className={sectionClass} aria-labelledby="identidade-heading">
               <div className="flex items-center gap-2">
-                <span role="img" aria-hidden="true">
-                  ??
-                </span>
                 <h2 id="identidade-heading" className="text-lg font-semibold text-gray-900">
                   Identidade do grupo
                 </h2>
@@ -345,25 +205,14 @@ export default function EditarGrupo({ grupo }) {
                       <span className="text-gray-400 text-sm">Preview</span>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white"
-                      aria-label="Selecionar imagem do grupo"
-                      disabled={uploadingImg}
-                    >
-                      {uploadingImg ? 'Enviando...' : 'Alterar imagem'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRemoverImagem}
-                      className="px-4 py-2 rounded bg-gray-200 text-gray-800 text-sm font-semibold hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:ring-offset-white"
-                      disabled={uploadingImg}
-                    >
-                      Remover
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white"
+                    aria-label="Selecionar imagem do grupo"
+                  >
+                    {uploadingImg ? 'Enviando...' : 'Carregar imagem'}
+                  </button>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -371,7 +220,6 @@ export default function EditarGrupo({ grupo }) {
                     className="hidden"
                     onChange={(e) => handleFileSelect(e.target.files?.[0])}
                   />
-                  <p className={helperClass}>JPG/PNG/WebP, ate 5MB.</p>
                   {errors.imagem && <p className={errorClass}>{errors.imagem}</p>}
                 </div>
                 <div className="flex-1 space-y-4">
@@ -387,12 +235,7 @@ export default function EditarGrupo({ grupo }) {
                       onChange={(e) => setNome(e.target.value)}
                       className={`${inputBaseClass} ${errors.nome ? 'border-red-500' : 'border-gray-200'}`}
                       maxLength={80}
-                      disabled={locked}
                     />
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>Nome visivel na listagem. (nao editavel)</span>
-                      <span>{nome.length}/80</span>
-                    </div>
                     {errors.nome && <p className={errorClass}>{errors.nome}</p>}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -408,12 +251,7 @@ export default function EditarGrupo({ grupo }) {
                         onChange={(e) => setSubtitulo(e.target.value)}
                         className={`${inputBaseClass} ${errors.subtitulo ? 'border-red-500' : 'border-gray-200'}`}
                         maxLength={120}
-                        disabled={locked}
                       />
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>Ex.: Premium Anual - 2 TB. (nao editavel)</span>
-                        <span>{subtitulo.length}/120</span>
-                      </div>
                       {errors.subtitulo && <p className={errorClass}>{errors.subtitulo}</p>}
                     </div>
                     <div className="space-y-1">
@@ -430,64 +268,170 @@ export default function EditarGrupo({ grupo }) {
                         rows={3}
                         maxLength={240}
                       />
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>Resumo curto do que o grupo oferece.</span>
-                        <span>{descricao.length}/240</span>
-                      </div>
                       {errors.descricao && <p className={errorClass}>{errors.descricao}</p>}
                     </div>
                   </div>
                 </div>
               </div>
             </section>
+            <section className={sectionClass} aria-labelledby="admin-heading">
+              <div className="flex items-center gap-2">
+                <h2 id="admin-heading" className="text-lg font-semibold text-gray-900">
+                  Administrador
+                </h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center text-xl font-bold text-gray-700 border">
+                  {adminAvatarExibicao ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={adminAvatarExibicao} alt={`Avatar de ${adminNomeExibicao}`} className="w-full h-full object-cover" />
+                  ) : (
+                    adminInitial
+                  )}
+                </div>
+                <div className="flex flex-col text-sm text-gray-700">
+                  <span className="font-semibold text-gray-900">{adminNomeExibicao}</span>
+                  {adminEmailExibicao && <span>{adminEmailExibicao}</span>}
+                  {adminIdExibicao && <span className="text-gray-500 text-xs">ID: {adminIdExibicao}</span>}
+                </div>
+              </div>
+            </section>
 
             <section className={sectionClass} aria-labelledby="assinatura-heading">
               <div className="flex items-center gap-2">
-                <span role="img" aria-hidden="true">💳</span>
                 <h2 id="assinatura-heading" className="text-lg font-semibold text-gray-900">
                   Informacoes da assinatura
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className={labelClass}>Mensalidade (R$)</p>
-                  <p className="text-2xl font-bold text-green-700">R$ {preco}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label htmlFor="preco" className={labelClass}>
+                    Mensalidade (R$) *
+                  </label>
+                  <input
+                    id="preco"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    aria-required="true"
+                    aria-invalid={!!errors.preco}
+                    value={preco}
+                    onChange={(e) => setPreco(e.target.value)}
+                    className={`${inputBaseClass} ${errors.preco ? 'border-red-500' : 'border-gray-200'}`}
+                  />
+                  {errors.preco && <p className={errorClass}>{errors.preco}</p>}
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className={labelClass}>Tempo estimado de entrega</p>
-                  <p className="text-gray-800 font-semibold">{tempoEntrega}</p>
+                <div className="space-y-1">
+                  <label htmlFor="tempoEntrega" className={labelClass}>
+                    Tempo estimado de entrega
+                  </label>
+                  <input
+                    id="tempoEntrega"
+                    value={tempoEntrega}
+                    onChange={(e) => setTempoEntrega(e.target.value)}
+                    className={`${inputBaseClass} border-gray-200`}
+                  />
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className={labelClass}>Tipo de acesso</p>
-                  <p className="text-gray-800 font-semibold">{acesso}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label htmlFor="capacidade" className={labelClass}>
+                    Capacidade total *
+                  </label>
+                  <input
+                    id="capacidade"
+                    type="number"
+                    min="0"
+                    aria-required="true"
+                    aria-invalid={!!errors.capacidadeTotal}
+                    value={capacidadeTotal}
+                    onChange={(e) => setCapacidadeTotal(e.target.value)}
+                    className={`${inputBaseClass} ${errors.capacidadeTotal ? 'border-red-500' : 'border-gray-200'}`}
+                  />
+                  {errors.capacidadeTotal && <p className={errorClass}>{errors.capacidadeTotal}</p>}
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className={labelClass}>Capacidade total</p>
-                  <p className="text-gray-800 font-semibold">{capacidadeTotal}</p>
-                  <p className={helperClass}>Nao editavel apos criacao.</p>
+                <div className="space-y-1">
+                  <label htmlFor="ativos" className={labelClass}>
+                    Membros ativos *
+                  </label>
+                  <input
+                    id="ativos"
+                    type="number"
+                    min="1"
+                    value={membrosAtivos}
+                    readOnly
+                    className={`${inputBaseClass} bg-gray-50 border-gray-200`}
+                  />
+                  <p className={helperClass}>Sempre 1 (administrador).</p>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className={labelClass}>Membros ativos</p>
-                  <p className="text-gray-800 font-semibold">{membrosAtivos}</p>
+                <div className="space-y-1">
+                  <label htmlFor="vagas" className={labelClass}>
+                    Vagas disponiveis
+                  </label>
+                  <input
+                    id="vagas"
+                    value={vagasDisponiveis}
+                    readOnly
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
+                    aria-readonly="true"
+                  />
+                  <p className={helperClass}>Capacidade - ativos.</p>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className={labelClass}>Vagas disponiveis</p>
-                  <p className="text-gray-800 font-semibold">{vagasDisponiveis}</p>
-                  <p className={helperClass}>Calculado automaticamente (capacidade - ativos).</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label htmlFor="acesso" className={labelClass}>
+                    Tipo de acesso
+                  </label>
+                  <select
+                    id="acesso"
+                    value={acesso}
+                    onChange={(e) => setAcesso(e.target.value)}
+                    className={`${inputBaseClass} border-gray-200`}
+                  >
+                    <option>Convite</option>
+                    <option>Acesso imediato</option>
+                    <option>Fila</option>
+                    <option>Pre-cadastro</option>
+                  </select>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className={labelClass}>Confiabilidade / selo</p>
-                  <p className="text-gray-800 font-semibold">{confiabilidade}</p>
+                <div className="space-y-1">
+                  <label htmlFor="confiabilidade" className={labelClass}>
+                    Confiabilidade / selo
+                  </label>
+                  <select
+                    id="confiabilidade"
+                    value={confiabilidade}
+                    disabled
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
+                  >
+                    <option>Selo ouro</option>
+                    <option>Selo prata</option>
+                    <option>Selo bronze</option>
+                    <option>Em verificacao</option>
+                  </select>
+                  <p className={helperClass}>Definido pelo sistema.</p>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className={labelClass}>Saidas agendadas</p>
-                  <p className="text-gray-800 font-semibold">{pedidosSaida}</p>
+                <div className="space-y-1">
+                  <label htmlFor="saidas" className={labelClass}>
+                    Saidas agendadas
+                  </label>
+                  <input
+                    id="saidas"
+                    type="number"
+                    min="0"
+                    value={pedidosSaida}
+                    readOnly
+                    disabled
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
+                  />
+                  <p className={helperClass}>Controlado pelo sistema.</p>
                 </div>
               </div>
             </section>
+
             <section className={sectionClass} aria-labelledby="conteudos-heading">
               <div className="flex items-center gap-2">
-                <span role="img" aria-hidden="true">📦</span>
                 <h2 id="conteudos-heading" className="text-lg font-semibold text-gray-900">
                   Conteudos do grupo
                 </h2>
@@ -497,10 +441,9 @@ export default function EditarGrupo({ grupo }) {
                   <label className={labelClass}>Beneficios *</label>
                   <button
                     type="button"
-                    onClick={() => adicionarItem(setBeneficios, beneficios, '')}
+                    onClick={() => adicionarItem(setBeneficios, beneficios, prompt('Novo beneficio') || '')}
                     className="text-sm text-blue-600 hover:underline"
                     aria-label="Adicionar beneficio"
-                    disabled={locked}
                   >
                     + adicionar
                   </button>
@@ -511,29 +454,21 @@ export default function EditarGrupo({ grupo }) {
                       <input
                         aria-label={`Beneficio ${idx + 1}`}
                         value={b}
-                        onChange={(e) => setBeneficios(beneficios.map((item, i) => (i === idx ? e.target.value : item)))}
+                        onChange={(e) =>
+                          setBeneficios(beneficios.map((item, i) => (i === idx ? e.target.value : item)))
+                        }
                         className={`${inputBaseClass} ${errors.beneficios ? 'border-red-500' : 'border-gray-200'}`}
-                        disabled={locked}
                       />
                       <button
                         type="button"
                         onClick={() => removerItem(setBeneficios, beneficios, idx)}
                         className="px-3 py-2 text-sm rounded bg-gray-100 hover:bg-gray-200"
                         aria-label="Remover beneficio"
-                        disabled={locked}
                       >
-                        ?
+                        ×
                       </button>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => adicionarItem(setBeneficios, beneficios, 'Novo beneficio')}
-                    className="text-sm text-blue-600 hover:underline"
-                    disabled={locked}
-                  >
-                    + adicionar beneficio
-                  </button>
                   {errors.beneficios && <p className={errorClass}>{errors.beneficios}</p>}
                 </div>
               </div>
@@ -543,14 +478,17 @@ export default function EditarGrupo({ grupo }) {
                   <label htmlFor="fidelidade-periodo" className={labelClass}>
                     Fidelidade - periodo
                   </label>
-                  <input
+                  <select
                     id="fidelidade-periodo"
                     value={fidelidadePeriodo}
                     onChange={(e) => setFidelidadePeriodo(e.target.value)}
                     className={`${inputBaseClass} border-gray-200`}
-                    maxLength={60}
-                    disabled={locked}
-                  />
+                  >
+                    <option>1 mes</option>
+                    <option>3 meses</option>
+                    <option>6 meses</option>
+                    <option>12 meses</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className={labelClass}>Renovacao automatica</label>
@@ -585,10 +523,9 @@ export default function EditarGrupo({ grupo }) {
                   <label className={labelClass}>Regras *</label>
                   <button
                     type="button"
-                    onClick={() => adicionarItem(setRegras, regras, '')}
+                    onClick={() => adicionarItem(setRegras, regras, prompt('Nova regra') || '')}
                     className="text-sm text-blue-600 hover:underline"
                     aria-label="Adicionar regra"
-                    disabled={locked}
                   >
                     + adicionar
                   </button>
@@ -599,30 +536,22 @@ export default function EditarGrupo({ grupo }) {
                       <input
                         aria-label={`Regra ${idx + 1}`}
                         value={regra}
-                        onChange={(e) => setRegras(regras.map((item, i) => (i === idx ? e.target.value : item)))}
+                        onChange={(e) =>
+                          setRegras(regras.map((item, i) => (i === idx ? e.target.value : item)))
+                        }
                         className="bg-transparent focus:outline-none text-sm w-40"
-                        disabled={locked}
                       />
                       <button
                         type="button"
                         onClick={() => removerItem(setRegras, regras, idx)}
                         className="text-gray-600 hover:text-gray-900"
                         aria-label="Remover regra"
-                        disabled={locked}
                       >
-                        ?
+                        ×
                       </button>
                     </div>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => adicionarItem(setRegras, regras, 'Nova regra')}
-                  className="text-sm text-blue-600 hover:underline"
-                  disabled={locked}
-                >
-                  + adicionar regra
-                </button>
                 {errors.regras && <p className={errorClass}>{errors.regras}</p>}
               </div>
 
@@ -637,78 +566,30 @@ export default function EditarGrupo({ grupo }) {
                   value={linkOficial}
                   onChange={(e) => setLinkOficial(e.target.value)}
                   className={`${inputBaseClass} ${errors.linkOficial ? 'border-red-500' : 'border-gray-200'}`}
-                  disabled={locked}
                 />
                 <p className={helperClass}>URL completa (http/https).</p>
                 {errors.linkOficial && <p className={errorClass}>{errors.linkOficial}</p>}
               </div>
             </section>
 
-            <section className={sectionClass} aria-labelledby="admin-heading">
-              <div className="flex items-center gap-2">
-                <span role="img" aria-hidden="true">👑</span>
-                <h2 id="admin-heading" className="text-lg font-semibold text-gray-900">
-                  Administrador
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2 flex flex-col items-center">
-                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 border">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={adminAvatar || 'https://ui-avatars.com/api/?name=Admin'} alt="Avatar admin" className="w-full h-full object-cover" />
-                  </div>
-                  <p className="text-sm text-gray-600">Pre-visualizacao do avatar.</p>
-                  <p className="text-base font-semibold text-gray-900 text-center break-words">{adminNome}</p>
-                  <p className="text-xs text-gray-500 break-all text-center">{adminAvatar}</p>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2 lg:col-span-2">
-                  <p className={labelClass}>Selos do administrador</p>
-                  <div className="flex flex-wrap gap-2">
-                    {adminSelos.map((selo, idx) => (
-                      <span
-                        key={`selo-${idx}`}
-                        className="bg-white border border-gray-200 px-3 py-1 rounded-full text-sm text-gray-800"
-                      >
-                        {selo}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
             <section className={sectionClass} aria-labelledby="participantes-heading">
               <div className="flex items-center gap-2">
-                <span role="img" aria-hidden="true">🧑‍🤝‍🧑</span>
                 <h2 id="participantes-heading" className="text-lg font-semibold text-gray-900">
                   Participantes
                 </h2>
               </div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <p className={labelClass}>Lista de participantes</p>
-                <div className="flex flex-wrap gap-3">
-                  {participantes.map((p, idx) => (
-                    <div key={`participante-${idx}`} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.avatar} alt={`Avatar de ${p.nome}`} className="w-8 h-8 rounded-full" />
-                      <span className="text-sm">{p.nome}</span>
-                      <button
-                        type="button"
-                        onClick={() => removerParticipante(idx)}
-                        className="text-gray-600 hover:text-gray-900"
-                        aria-label={`Remover ${p.nome}`}
-                      >
-                        ?
-                      </button>
-                    </div>
-                  ))}
-                </div>
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">Somente perfis cadastrados podem ingressar. O criador nao adiciona participantes manualmente.</p>
+                {grupo.participantesIds?.length ? (
+                  <p className="text-sm text-gray-700">{grupo.participantesIds.length} participante(s) vinculado(s).</p>
+                ) : (
+                  <p className="text-sm text-gray-500">Nenhum participante ainda.</p>
+                )}
               </div>
-              {errors.participantes && <p className={errorClass}>{errors.participantes}</p>}
             </section>
 
             <section className={sectionClass} aria-labelledby="faq-heading">
               <div className="flex items-center gap-2">
-                <span role="img" aria-hidden="true">❓</span>
                 <h2 id="faq-heading" className="text-lg font-semibold text-gray-900">
                   FAQ
                 </h2>
@@ -746,7 +627,11 @@ export default function EditarGrupo({ grupo }) {
                     </div>
                   </div>
                 ))}
-                <button type="button" onClick={adicionarFaq} className="text-sm text-blue-600 hover:underline">
+                <button
+                  type="button"
+                  onClick={adicionarFaq}
+                  className="text-sm text-blue-600 hover:underline"
+                >
                   + adicionar pergunta
                 </button>
                 {errors.faq && <p className={errorClass}>{errors.faq}</p>}
@@ -761,7 +646,7 @@ export default function EditarGrupo({ grupo }) {
                   disabled={salvando}
                   aria-busy={salvando}
                 >
-                  {salvando ? 'Salvando...' : 'Atualizar grupo'}
+                  {salvando ? 'Salvando...' : 'Salvar alteracoes'}
                 </button>
                 {sucesso && <p className="mt-3 text-green-700 text-sm">{sucesso}</p>}
                 {msg && !sucesso && <p className="mt-3 text-red-600 text-sm">{msg}</p>}
@@ -774,21 +659,16 @@ export default function EditarGrupo({ grupo }) {
   );
 }
 
-export async function getServerSideProps(context) {
-  const { id } = context.params;
-
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/grupos/${id}`);
-  if (!res.ok) {
-    return {
-      notFound: true,
-    };
+export async function getServerSideProps({ params }) {
+  const { id } = params;
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/grupos/${id}`);
+    if (!res.ok) {
+      return { notFound: true };
+    }
+    const grupo = await res.json();
+    return { props: { grupo } };
+  } catch (error) {
+    return { notFound: true };
   }
-
-  const grupo = await res.json();
-
-  return {
-    props: { grupo },
-  };
 }
-
-

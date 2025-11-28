@@ -1,10 +1,12 @@
 ﻿
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import Header from '../../../components/Header';
 
 export default function NovoGrupo() {
   const router = useRouter();
+  const { data: session } = useSession();
   const fileInputRef = useRef(null);
   const [nome, setNome] = useState('');
   const [capa, setCapa] = useState('');
@@ -15,12 +17,12 @@ export default function NovoGrupo() {
   const [preco, setPreco] = useState('');
   const [descricao, setDescricao] = useState('');
   const [capacidadeTotal, setCapacidadeTotal] = useState('');
-  const [membrosAtivos, setMembrosAtivos] = useState('');
-  const [pedidosSaida, setPedidosSaida] = useState('');
+  const [membrosAtivos, setMembrosAtivos] = useState('1');
+  const [pedidosSaida, setPedidosSaida] = useState('0');
   const [subtitulo, setSubtitulo] = useState('');
   const [acesso, setAcesso] = useState('Convite');
   const [tempoEntrega, setTempoEntrega] = useState('Ate 5 dias (geralmente mais rapido)');
-  const [confiabilidade, setConfiabilidade] = useState('Selo ouro');
+  const [confiabilidade] = useState('Selo ouro');
   const [beneficios, setBeneficios] = useState([
     'Armazenamento 2 TB compartilhado',
     'Contas individuais preservam privacidade',
@@ -40,19 +42,19 @@ export default function NovoGrupo() {
     { pergunta: 'Com quem posso dividir assinaturas?', resposta: 'Apenas com membros aprovados pelo administrador do grupo.' },
   ]);
   const [linkOficial, setLinkOficial] = useState('https://one.google.com/');
-  const [adminNome, setAdminNome] = useState('Isabela');
-  const [adminAvatar, setAdminAvatar] = useState('https://i.pravatar.cc/160?img=47');
-  const [adminSelos, setAdminSelos] = useState(['Mais de 1 grupo ativo', '+1 ano de plataforma', 'Envio rapido']);
-  const [participantes, setParticipantes] = useState([
-    { nome: 'Deyves', avatar: 'https://ui-avatars.com/api/?name=Deyves' },
-    { nome: 'Luciene', avatar: 'https://ui-avatars.com/api/?name=Luciene' },
-    { nome: 'Rafael', avatar: 'https://ui-avatars.com/api/?name=Rafael' },
-    { nome: 'Nicholas', avatar: 'https://ui-avatars.com/api/?name=Nicholas' },
-  ]);
+  const [adminNome, setAdminNome] = useState('');
+  const [adminAvatar, setAdminAvatar] = useState('');
+  const [participantes] = useState([]);
   const [msg, setMsg] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [criando, setCriando] = useState(false);
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    if (!session?.user) return;
+    setAdminNome(session.user.nome || session.user.name || session.user.email || 'Administrador');
+    setAdminAvatar(session.user.image || '');
+  }, [session]);
 
   const vagasDisponiveis = useMemo(() => {
     const cap = Number(capacidadeTotal) || 0;
@@ -76,15 +78,9 @@ export default function NovoGrupo() {
     if (!beneficiosValidos) novoErrors.beneficios = 'Adicione pelo menos 1 beneficio.';
     const regrasValidas = regras.some((r) => r.trim());
     if (!regrasValidas) novoErrors.regras = 'Adicione pelo menos 1 regra.';
-    const adminSelosValidos = adminSelos.some((s) => s.trim());
-    if (!adminSelosValidos) novoErrors.adminSelos = 'Adicione pelo menos 1 selo.';
-    const participantesValidos = participantes.some((p) => p.nome.trim());
-    if (!participantesValidos) novoErrors.participantes = 'Adicione pelo menos 1 participante.';
     if (!faq.length || faq.some((item) => !item.pergunta.trim() || !item.resposta.trim())) novoErrors.faq = 'Preencha pergunta e resposta.';
     if (imagemFile && imagemFile.size > 5 * 1024 * 1024) novoErrors.imagem = 'Imagem deve ter ate 5MB.';
     if (imagemFile && !['image/png', 'image/jpeg', 'image/webp'].includes(imagemFile.type)) novoErrors.imagem = 'Use JPG, PNG ou WebP.';
-    if (!adminNome.trim()) novoErrors.adminNome = 'Nome do admin e obrigatorio.';
-    if (adminAvatar && !validarUrl(adminAvatar)) novoErrors.adminAvatar = 'Avatar deve ser URL valida.';
     if (!descricao.trim()) novoErrors.descricao = 'Descricao e obrigatoria.';
     if (!subtitulo.trim()) novoErrors.subtitulo = 'Subtitulo e obrigatorio.';
     setErrors(novoErrors);
@@ -110,8 +106,8 @@ export default function NovoGrupo() {
       .filter((f) => f.pergunta.trim() && f.resposta.trim())
       .map((f) => `${f.pergunta.trim()}|${f.resposta.trim()}`)
       .join('\n');
-    const participantesText = participantes.map((p) => p.nome.trim()).filter(Boolean).join('\n');
-    const adminSelosText = adminSelos.map((s) => s.trim()).filter(Boolean).join('\n');
+    const usuarioId = session?.user?.id || session?.user?._id || session?.user?.sub || '';
+    const adminId = usuarioId && typeof usuarioId === 'string' ? usuarioId : '';
 
     const payload = {
       nome,
@@ -119,23 +115,28 @@ export default function NovoGrupo() {
       imageUrl: capa,
       imageKey,
       preco: parseFloat(preco),
+      precoCentavos: Math.round(parseFloat(preco) * 100),
       descricao,
       capacidadeTotal: Number(capacidadeTotal) || 0,
-      membrosAtivos: Number(membrosAtivos) || 0,
+      membrosAtivos: 1,
       pedidosSaida: Number(pedidosSaida) || 0,
       subtitulo,
       acesso,
       tempoEntrega,
       confiabilidade,
       beneficios: beneficiosText,
-      fidelidade: fidelidadeText,
+      fidelidadePeriodo,
+      fidelidadeRenovacao,
+      fidelidadeObservacoes,
       regras: regrasText,
       faq: faqText,
-      linkOficial,
+      linkOficial: linkOficial?.trim() || null,
+      adminId,
+      adminEmail: session?.user?.email || '',
       adminNome,
       adminAvatar,
-      adminSelos: adminSelosText,
-      participantes: participantesText,
+      participantesIds: [],
+      status: 'ativo',
     };
 
     try {
@@ -194,16 +195,6 @@ export default function NovoGrupo() {
 
   const adicionarFaq = () => setFaq([...faq, { pergunta: '', resposta: '' }]);
   const removerFaq = (index) => setFaq(faq.filter((_, i) => i !== index));
-
-  const adicionarParticipante = (nomeNovo) => {
-    if (!nomeNovo.trim()) return;
-    setParticipantes([
-      ...participantes,
-      { nome: nomeNovo.trim(), avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(nomeNovo.trim())}` },
-    ]);
-  };
-
-  const removerParticipante = (index) => setParticipantes(participantes.filter((_, i) => i !== index));
 
   const handleFileSelect = (file) => {
     if (!file) return;
@@ -409,9 +400,10 @@ export default function NovoGrupo() {
                     aria-required="true"
                     aria-invalid={!!errors.membrosAtivos}
                     value={membrosAtivos}
-                    onChange={(e) => setMembrosAtivos(e.target.value)}
-                    className={`${inputBaseClass} ${errors.membrosAtivos ? 'border-red-500' : 'border-gray-200'}`}
+                    readOnly
+                    className={`${inputBaseClass} bg-gray-50 ${errors.membrosAtivos ? 'border-red-500' : 'border-gray-200'}`}
                   />
+                  <p className={helperClass}>Sempre inicia com 1 (administrador).</p>
                   {errors.membrosAtivos && <p className={errorClass}>{errors.membrosAtivos}</p>}
                 </div>
                 <div className="space-y-1">
@@ -442,7 +434,7 @@ export default function NovoGrupo() {
                     <option>Convite</option>
                     <option>Acesso imediato</option>
                     <option>Fila</option>
-                    <option>Pré-cadastro</option>
+                    <option>Pre-cadastro</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -452,14 +444,15 @@ export default function NovoGrupo() {
                   <select
                     id="confiabilidade"
                     value={confiabilidade}
-                    onChange={(e) => setConfiabilidade(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    disabled
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                   >
                     <option>Selo ouro</option>
                     <option>Selo prata</option>
                     <option>Selo bronze</option>
-                    <option>Em verificação</option>
+                    <option>Em verificacao</option>
                   </select>
+                  <p className={helperClass}>Definido automaticamente pelo sistema.</p>
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="saidas" className={labelClass}>
@@ -470,9 +463,11 @@ export default function NovoGrupo() {
                     type="number"
                     min="0"
                     value={pedidosSaida}
-                    onChange={(e) => setPedidosSaida(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    readOnly
+                    disabled
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                   />
+                  <p className={helperClass}>Campo controlado pelo sistema.</p>
                 </div>
               </div>
             </section>
@@ -532,15 +527,19 @@ export default function NovoGrupo() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label htmlFor="fidelidade-periodo" className={labelClass}>
-                    Fidelidade - período
+                    Fidelidade - periodo
                   </label>
-                  <input
+                  <select
                     id="fidelidade-periodo"
                     value={fidelidadePeriodo}
                     onChange={(e) => setFidelidadePeriodo(e.target.value)}
                     className={`${inputBaseClass} border-gray-200`}
-                    maxLength={60}
-                  />
+                  >
+                    <option>1 mes</option>
+                    <option>3 meses</option>
+                    <option>6 meses</option>
+                    <option>12 meses</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className={labelClass}>Renovação automática</label>
@@ -631,87 +630,9 @@ export default function NovoGrupo() {
               </div>
             </section>
 
-            <section className={sectionClass} aria-labelledby="admin-heading">
-              <div className="flex items-center gap-2">
-                <span role="img" aria-hidden="true">
-                  ??
-                </span>
-                <h2 id="admin-heading" className="text-lg font-semibold text-gray-900">
-                  Administrador
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1 sm:col-span-2">
-                  <label htmlFor="adminNome" className={labelClass}>
-                    Nome do administrador *
-                  </label>
-                  <input
-                    id="adminNome"
-                    aria-required="true"
-                    aria-invalid={!!errors.adminNome}
-                    value={adminNome}
-                    onChange={(e) => setAdminNome(e.target.value)}
-                    className={`${inputBaseClass} ${errors.adminNome ? 'border-red-500' : 'border-gray-200'}`}
-                  />
-                  {errors.adminNome && <p className={errorClass}>{errors.adminNome}</p>}
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor="adminAvatar" className={labelClass}>
-                    Avatar (URL)
-                  </label>
-                  <input
-                    id="adminAvatar"
-                    aria-invalid={!!errors.adminAvatar}
-                    value={adminAvatar}
-                    onChange={(e) => setAdminAvatar(e.target.value)}
-                    className={`${inputBaseClass} ${errors.adminAvatar ? 'border-red-500' : 'border-gray-200'}`}
-                  />
-                  {errors.adminAvatar && <p className={errorClass}>{errors.adminAvatar}</p>}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100 border">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={adminAvatar || 'https://ui-avatars.com/api/?name=Admin'} alt="Avatar admin" className="w-full h-full object-cover" />
-                </div>
-                <p className="text-sm text-gray-600">Pré-visualização do avatar.</p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className={labelClass}>Selos do administrador *</label>
-                  <button
-                    type="button"
-                    onClick={() => adicionarItem(setAdminSelos, adminSelos, 'Novo selo')}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    + adicionar selo
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {adminSelos.map((selo, idx) => (
-                    <div key={`selo-${idx}`} className="flex items-center gap-2">
-                      <input
-                        aria-label={`Selo ${idx + 1}`}
-                        value={selo}
-                        onChange={(e) =>
-                          setAdminSelos(adminSelos.map((item, i) => (i === idx ? e.target.value : item)))
-                        }
-                        className={`${inputBaseClass} ${errors.adminSelos ? 'border-red-500' : 'border-gray-200'}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removerItem(setAdminSelos, adminSelos, idx)}
-                        className="px-3 py-2 text-sm rounded bg-gray-100 hover:bg-gray-200"
-                        aria-label="Remover selo"
-                      >
-                        ?
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {errors.adminSelos && <p className={errorClass}>{errors.adminSelos}</p>}
-              </div>
-            </section>
+            
+
+            
             <section className={sectionClass} aria-labelledby="participantes-heading">
               <div className="flex items-center gap-2">
                 <span role="img" aria-hidden="true">
@@ -722,53 +643,23 @@ export default function NovoGrupo() {
                 </h2>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    aria-label="Adicionar participante"
-                    placeholder="Nome do participante"
-                    className={`${inputBaseClass} border-gray-200`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        adicionarParticipante(e.currentTarget.value);
-                        e.currentTarget.value = '';
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      const input = e.currentTarget.previousElementSibling;
-                      if (input?.value) {
-                        adicionarParticipante(input.value);
-                        input.value = '';
-                      }
-                    }}
-                    className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
-                  >
-                    + adicionar
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {participantes.map((p, idx) => (
-                    <div key={`participante-${idx}`} className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.avatar} alt={`Avatar de ${p.nome}`} className="w-8 h-8 rounded-full" />
-                      <span className="text-sm">{p.nome}</span>
-                      <button
-                        type="button"
-                        onClick={() => removerParticipante(idx)}
-                        className="text-gray-600 hover:text-gray-900"
-                        aria-label={`Remover ${p.nome}`}
-                      >
-                        ?
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {errors.participantes && <p className={errorClass}>{errors.participantes}</p>}
+                <p className="text-sm text-gray-600">Somente perfis cadastrados podem ingressar. O criador nao adiciona participantes manualmente.</p>
+                {participantes.length ? (
+                  <div className="flex flex-wrap gap-3">
+                    {participantes.map((p, idx) => (
+                      <div key={`participante-${idx}`} className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.avatar} alt={`Avatar de ${p.nome}`} className="w-8 h-8 rounded-full" />
+                        <span className="text-sm">{p.nome}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Nenhum participante ainda.</p>
+                )}
               </div>
             </section>
+
 
             <section className={sectionClass} aria-labelledby="faq-heading">
               <div className="flex items-center gap-2">
