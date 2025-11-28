@@ -43,6 +43,11 @@ const parseFidelidade = (valor) => {
 export default function EditarGrupo({ grupo }) {
   const router = useRouter();
   const fileInputRef = useRef(null);
+  const adminNomeExibicao = grupo.adminNome || grupo.admin?.nome || 'Administrador';
+  const adminAvatarExibicao = grupo.adminAvatar || grupo.admin?.avatar || '';
+  const adminEmailExibicao = grupo.adminEmail || grupo.admin?.email || '';
+  const adminIdExibicao = grupo.adminIdString || grupo.adminId || '';
+  const adminInitial = (adminNomeExibicao?.[0] || 'A').toUpperCase();
 
   const [nome, setNome] = useState(grupo.nome || '');
   const [capa, setCapa] = useState(grupo.imageUrl || grupo.capa || '');
@@ -266,6 +271,28 @@ export default function EditarGrupo({ grupo }) {
                       {errors.descricao && <p className={errorClass}>{errors.descricao}</p>}
                     </div>
                   </div>
+                </div>
+              </div>
+            </section>
+            <section className={sectionClass} aria-labelledby="admin-heading">
+              <div className="flex items-center gap-2">
+                <h2 id="admin-heading" className="text-lg font-semibold text-gray-900">
+                  Administrador
+                </h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center text-xl font-bold text-gray-700 border">
+                  {adminAvatarExibicao ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={adminAvatarExibicao} alt={`Avatar de ${adminNomeExibicao}`} className="w-full h-full object-cover" />
+                  ) : (
+                    adminInitial
+                  )}
+                </div>
+                <div className="flex flex-col text-sm text-gray-700">
+                  <span className="font-semibold text-gray-900">{adminNomeExibicao}</span>
+                  {adminEmailExibicao && <span>{adminEmailExibicao}</span>}
+                  {adminIdExibicao && <span className="text-gray-500 text-xs">ID: {adminIdExibicao}</span>}
                 </div>
               </div>
             </section>

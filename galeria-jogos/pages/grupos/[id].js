@@ -78,9 +78,13 @@ export default function GrupoDetalhe({ grupo }) {
   const regras = Array.isArray(dados.regras) && dados.regras.length ? dados.regras : DEFAULT_CONTENT.regras;
   const faq = Array.isArray(dados.faq) && dados.faq.length ? dados.faq : DEFAULT_CONTENT.faq;
   const linkOficial = dados.linkOficial || DEFAULT_CONTENT.linkOficial;
-  const adminNome = dados.admin?.nome || DEFAULT_CONTENT.admin.nome;
-  const adminAvatar = dados.admin?.avatar || DEFAULT_CONTENT.admin.avatar;
-  const adminSelos = Array.isArray(dados.admin?.selos) && dados.admin?.selos.length ? dados.admin.selos : DEFAULT_CONTENT.admin.selos;
+  const adminNome = dados.adminNome || dados.admin?.nome || DEFAULT_CONTENT.admin.nome;
+  const adminAvatar = dados.adminAvatar || dados.admin?.avatar || DEFAULT_CONTENT.admin.avatar;
+  const adminSelos = Array.isArray(dados.adminSelos)
+    ? dados.adminSelos
+    : Array.isArray(dados.admin?.selos) && dados.admin?.selos.length
+    ? dados.admin.selos
+    : DEFAULT_CONTENT.admin.selos;
   const participantes =
     Array.isArray(dados.participantes) && dados.participantes.length
       ? dados.participantes.map((item, idx) =>
