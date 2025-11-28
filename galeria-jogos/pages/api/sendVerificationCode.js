@@ -1,28 +1,22 @@
 import nodemailer from "nodemailer";
 import crypto from "crypto";
-import { MongoClient } from "mongodb";
+import clientPromise from "../../lib/mongodb";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ message: "Método não permitido" });
+    return res.status(405).json({ message: "Metodo nao permitido" });
   }
 
-  const { email } = req.body;
-
+  const { email } = req.body || {};
   if (!email) {
-    return res.status(400).json({ message: "E-mail é obrigatório" });
+    return res.status(400).json({ message: "E-mail e obrigatorio." });
   }
 
   try {
-    console.log("Recebido e-mail para envio do código:", email);
+    const codigo = crypto.randomBytes(3).toString("hex").toUpperCase(); // 6 chars
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
+    const createdAt = new Date();
 
-    // Gerar código de verificação
-    const codigo = crypto.randomBytes(3).toString("hex");
-    const expirationTime = Date.now() + 60000; // 1 minuto
-
-    console.log("Código gerado:", codigo);
-
-    // Configuração do Nodemailer
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -30,38 +24,38 @@ export default async function handler(req, res) {
         pass: process.env.EMAIL_PASS,
       },
       tls: {
-        rejectUnauthorized: false, // ⚠️ Apenas para desenvolvimento
+        // evita falha em ambientes com certificado self-signed
+        rejectUnauthorized: false,
       },
     });
 
-    // Verificar transporte
     await transporter.verify();
-
-    // Enviar o e-mail
-    const info = await transporter.sendMail({
+    await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Código de Verificação",
-      text: `Seu código de verificação é: ${codigo}`,
+      subject: "Codigo de verificacao",
+      text: `Seu codigo de verificacao: ${codigo}`,
     });
 
-    console.log("E-mail enviado:", info.messageId);
-
-    // Salvar no banco
-    const client = await MongoClient.connect(process.env.MONGODB_URI);
+    const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB);
 
     await db.collection("verificationCodes").insertOne({
       email,
       codigo,
-      expirationTime,
+      tipo: "validacao_cadastro",
+      status: "pendente",
+      tentativas: 0,
+      expiresAt,
+      createdAt,
+      usedAt: null,
+      ipOrigem: req.headers["x-forwarded-for"] || req.socket?.remoteAddress || null,
+      userAgent: req.headers["user-agent"] || null,
     });
 
-    client.close();
-
-    return res.status(200).json({ message: "Código enviado com sucesso!" });
+    return res.status(200).json({ message: "Codigo enviado com sucesso!" });
   } catch (error) {
-    console.error("Erro ao enviar o código:", error);
-    return res.status(500).json({ message: "Erro ao enviar o código." });
+    console.error("Erro ao enviar o codigo:", error);
+    return res.status(500).json({ message: "Erro ao enviar o codigo." });
   }
 }

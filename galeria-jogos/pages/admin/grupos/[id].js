@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../../components/Header';
+import clientPromise from '../../../lib/mongodb';
+import { ObjectId } from 'mongodb';
 
 const inputBaseClass = 'w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition';
 const labelClass = 'text-sm font-semibold text-gray-800 flex items-center gap-2';
@@ -40,7 +42,7 @@ const parseFidelidade = (valor) => {
   return { periodo: '12 meses', renovacao: true, observacoes: '' };
 };
 
-export default function EditarGrupo({ grupo }) {
+export default function EditarGrupo({ grupo, participantes = [] }) {
   const router = useRouter();
   const fileInputRef = useRef(null);
   const adminNomeExibicao = grupo.adminNome || grupo.admin?.nome || 'Administrador';
@@ -55,15 +57,23 @@ export default function EditarGrupo({ grupo }) {
   const [imagemFile, setImagemFile] = useState(null);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [imageKey, setImageKey] = useState(grupo.imageKey || '');
-  const [preco, setPreco] = useState(grupo.preco || '');
+  const [valorTotal] = useState(grupo.valorTotal ?? '');
+  const [valorPorVaga] = useState(grupo.valorPorVaga ?? '');
   const [descricao, setDescricao] = useState(grupo.descricao || '');
   const [capacidadeTotal, setCapacidadeTotal] = useState(grupo.capacidadeTotal ?? '');
-  const [membrosAtivos] = useState(1); // fixo
-  const [pedidosSaida] = useState(grupo.pedidosSaida ?? 0);
+  const [vagasReservadasAdmin, setVagasReservadasAdmin] = useState(grupo.vagasReservadasAdmin ?? 1);
   const [subtitulo, setSubtitulo] = useState(grupo.subtitulo || '');
-  const [acesso, setAcesso] = useState(grupo.acesso || 'Convite');
+  const [acesso, setAcesso] = useState(grupo.acesso || 'imediato');
   const [tempoEntrega, setTempoEntrega] = useState(grupo.tempoEntrega || 'Ate 5 dias (geralmente mais rapido)');
   const [confiabilidade] = useState(grupo.confiabilidade || 'Selo ouro');
+  const [tipoGrupo, setTipoGrupo] = useState(grupo.tipoGrupo || 'publico');
+  const [status, setStatus] = useState(grupo.status || 'ativo');
+  const [statusDetalhado, setStatusDetalhado] = useState(grupo.statusDetalhado || 'em_formacao');
+  const [servicoPreAssinado, setServicoPreAssinado] = useState(Boolean(grupo.servicoPreAssinado));
+  const [envioAutomaticoAcesso, setEnvioAutomaticoAcesso] = useState(Boolean(grupo.envioAutomaticoAcesso));
+  const [filaEsperaAtiva, setFilaEsperaAtiva] = useState(Boolean(grupo.filaEsperaAtiva));
+  const [necessitaAnalise, setNecessitaAnalise] = useState(Boolean(grupo.necessitaAnalise));
+  const [observacoesInternas, setObservacoesInternas] = useState(grupo.observacoesInternas || '');
   const [beneficios, setBeneficios] = useState(parseLista(grupo.beneficios, []));
   const fidelidadeParsed = parseFidelidade(grupo.fidelidade);
   const [fidelidadePeriodo, setFidelidadePeriodo] = useState(fidelidadeParsed.periodo);
@@ -79,22 +89,29 @@ export default function EditarGrupo({ grupo }) {
 
   const vagasDisponiveis = useMemo(() => {
     const cap = Number(capacidadeTotal) || 0;
-    const ativos = Number(membrosAtivos) || 0;
-    return Math.max(cap - ativos, 0);
-  }, [capacidadeTotal, membrosAtivos]);
+    const reservadas = Number(vagasReservadasAdmin) || 0;
+    return Math.max(cap - reservadas, 0);
+  }, [capacidadeTotal, vagasReservadasAdmin]);
 
   const validarUrl = (url) => /^https?:\/\/[\w.-]+(\/[\w\-./?%&=]*)?$/.test((url || '').trim());
 
   const validateForm = () => {
     const novoErrors = {};
     if (!nome.trim()) novoErrors.nome = 'Nome e obrigatorio.';
-    if (!preco || Number.isNaN(Number(preco))) novoErrors.preco = 'Informe um preco valido.';
+    if (!valorTotal || Number.isNaN(Number(valorTotal))) novoErrors.valorTotal = 'Informe o valor total.';
+    if (!valorPorVaga || Number.isNaN(Number(valorPorVaga))) novoErrors.valorPorVaga = 'Informe o valor por vaga.';
     const cap = Number(capacidadeTotal);
     if (Number.isNaN(cap)) novoErrors.capacidadeTotal = 'Capacidade deve ser numero.';
+    if (!Number.isNaN(cap) && cap <= 0) novoErrors.capacidadeTotal = 'Capacidade deve ser maior que zero.';
+    const reservadas = Number(vagasReservadasAdmin);
+    if (Number.isNaN(reservadas) || reservadas < 0) novoErrors.vagasReservadasAdmin = 'Vagas reservadas deve ser zero ou mais.';
+    if (!Number.isNaN(reservadas) && !Number.isNaN(cap) && reservadas > cap) novoErrors.vagasReservadasAdmin = 'Reservadas nao podem exceder a capacidade.';
     if (!linkOficial || !validarUrl(linkOficial)) novoErrors.linkOficial = 'Informe uma URL valida (http/https).';
     if (!beneficios.length) novoErrors.beneficios = 'Adicione pelo menos 1 beneficio.';
     if (!regras.length) novoErrors.regras = 'Adicione pelo menos 1 regra.';
     if (!faq.length || faq.some((i) => !i.pergunta.trim() || !i.resposta.trim())) novoErrors.faq = 'FAQ precisa de pergunta e resposta.';
+    if (!subtitulo.trim()) novoErrors.subtitulo = 'Subtitulo e obrigatorio.';
+    if (!descricao.trim()) novoErrors.descricao = 'Descricao e obrigatoria.';
     setErrors(novoErrors);
     return Object.keys(novoErrors).length === 0;
   };
@@ -140,22 +157,31 @@ export default function EditarGrupo({ grupo }) {
       capa,
       imageUrl: capa,
       imageKey,
-      preco: parseFloat(preco),
+      valorTotal: parseFloat(valorTotal),
+      valorPorVaga: parseFloat(valorPorVaga),
       descricao,
       capacidadeTotal: Number(capacidadeTotal) || 0,
-      membrosAtivos: 1,
-      pedidosSaida: Number(pedidosSaida) || 0,
+      vagasReservadasAdmin: Number(vagasReservadasAdmin) || 0,
+      vagasDisponiveis,
       subtitulo,
       acesso,
       tempoEntrega,
       confiabilidade,
-      beneficios,
+      tipoGrupo,
+      status,
+      statusDetalhado,
+      servicoPreAssinado,
+      envioAutomaticoAcesso,
+      filaEsperaAtiva,
+      necessitaAnalise,
+      observacoesInternas,
+      beneficios: beneficios.map((b) => b.trim()).filter(Boolean),
       fidelidadePeriodo,
       fidelidadeRenovacao,
       fidelidadeObservacoes,
-      regras,
-      faq,
-      linkOficial,
+      regras: regras.map((r) => r.trim()).filter(Boolean),
+      faq: faq.map((f) => ({ pergunta: f.pergunta.trim(), resposta: f.resposta.trim() })),
+      linkOficial: linkOficial?.trim() || '',
       adminId: grupo.adminIdString || grupo.adminId || '',
       adminEmail: grupo.adminEmail || '',
       adminNome: grupo.adminNome || grupo.admin?.nome || '',
@@ -235,6 +261,9 @@ export default function EditarGrupo({ grupo }) {
                       onChange={(e) => setNome(e.target.value)}
                       className={`${inputBaseClass} ${errors.nome ? 'border-red-500' : 'border-gray-200'}`}
                       maxLength={80}
+                    readOnly
+                    disabled
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                     />
                     {errors.nome && <p className={errorClass}>{errors.nome}</p>}
                   </div>
@@ -248,8 +277,9 @@ export default function EditarGrupo({ grupo }) {
                         aria-required="true"
                         aria-invalid={!!errors.subtitulo}
                         value={subtitulo}
-                        onChange={(e) => setSubtitulo(e.target.value)}
-                        className={`${inputBaseClass} ${errors.subtitulo ? 'border-red-500' : 'border-gray-200'}`}
+                        readOnly
+                        disabled
+                        className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                         maxLength={120}
                       />
                       {errors.subtitulo && <p className={errorClass}>{errors.subtitulo}</p>}
@@ -263,8 +293,9 @@ export default function EditarGrupo({ grupo }) {
                         aria-required="true"
                         aria-invalid={!!errors.descricao}
                         value={descricao}
-                        onChange={(e) => setDescricao(e.target.value)}
-                        className={`${inputBaseClass} ${errors.descricao ? 'border-red-500' : 'border-gray-200'}`}
+                        readOnly
+                        disabled
+                        className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                         rows={3}
                         maxLength={240}
                       />
@@ -305,32 +336,40 @@ export default function EditarGrupo({ grupo }) {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="preco" className={labelClass}>
-                    Mensalidade (R$) *
+                  <label htmlFor="valorTotal" className={labelClass}>
+                    Valor total (R$) *
                   </label>
                   <input
-                    id="preco"
+                    id="valorTotal"
                     type="number"
                     inputMode="decimal"
                     step="0.01"
                     aria-required="true"
-                    aria-invalid={!!errors.preco}
-                    value={preco}
-                    onChange={(e) => setPreco(e.target.value)}
-                    className={`${inputBaseClass} ${errors.preco ? 'border-red-500' : 'border-gray-200'}`}
+                    aria-invalid={!!errors.valorTotal}
+                    value={valorTotal}
+                    readOnly
+                    disabled
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                   />
-                  {errors.preco && <p className={errorClass}>{errors.preco}</p>}
+                  {errors.valorTotal && <p className={errorClass}>{errors.valorTotal}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="tempoEntrega" className={labelClass}>
-                    Tempo estimado de entrega
+                  <label htmlFor="valorPorVaga" className={labelClass}>
+                    Valor por vaga (R$) *
                   </label>
                   <input
-                    id="tempoEntrega"
-                    value={tempoEntrega}
-                    onChange={(e) => setTempoEntrega(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    id="valorPorVaga"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    aria-required="true"
+                    aria-invalid={!!errors.valorPorVaga}
+                    value={valorPorVaga}
+                    readOnly
+                    disabled
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                   />
+                  {errors.valorPorVaga && <p className={errorClass}>{errors.valorPorVaga}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -345,24 +384,28 @@ export default function EditarGrupo({ grupo }) {
                     aria-required="true"
                     aria-invalid={!!errors.capacidadeTotal}
                     value={capacidadeTotal}
-                    onChange={(e) => setCapacidadeTotal(e.target.value)}
-                    className={`${inputBaseClass} ${errors.capacidadeTotal ? 'border-red-500' : 'border-gray-200'}`}
+                    readOnly
+                    disabled
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                   />
                   {errors.capacidadeTotal && <p className={errorClass}>{errors.capacidadeTotal}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="ativos" className={labelClass}>
-                    Membros ativos *
+                  <label htmlFor="reservadas" className={labelClass}>
+                    Vagas reservadas (admin)
                   </label>
                   <input
-                    id="ativos"
+                    id="reservadas"
                     type="number"
                     min="1"
-                    value={membrosAtivos}
-                    readOnly
-                    className={`${inputBaseClass} bg-gray-50 border-gray-200`}
+                    max={Number(capacidadeTotal) || undefined}
+                    aria-invalid={!!errors.vagasReservadasAdmin}
+                    value={vagasReservadasAdmin}
+                    onChange={(e) => setVagasReservadasAdmin(e.target.value)}
+                    className={`${inputBaseClass} ${errors.vagasReservadasAdmin ? 'border-red-500' : 'border-gray-200'}`}
                   />
-                  <p className={helperClass}>Sempre 1 (administrador).</p>
+                  <p className={helperClass}>1 vaga sempre do admin; se houver vagas, ele pode reservar mais.</p>
+                  {errors.vagasReservadasAdmin && <p className={errorClass}>{errors.vagasReservadasAdmin}</p>}
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="vagas" className={labelClass}>
@@ -375,7 +418,7 @@ export default function EditarGrupo({ grupo }) {
                     className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                     aria-readonly="true"
                   />
-                  <p className={helperClass}>Capacidade - ativos.</p>
+                  <p className={helperClass}>Capacidade - vagas reservadas.</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -389,44 +432,99 @@ export default function EditarGrupo({ grupo }) {
                     onChange={(e) => setAcesso(e.target.value)}
                     className={`${inputBaseClass} border-gray-200`}
                   >
-                    <option>Convite</option>
-                    <option>Acesso imediato</option>
-                    <option>Fila</option>
-                    <option>Pre-cadastro</option>
+                    <option value="imediato">Envio imediato</option>
+                    <option value="apos_completar">Apos completar grupo</option>
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="confiabilidade" className={labelClass}>
-                    Confiabilidade / selo
-                  </label>
-                  <select
-                    id="confiabilidade"
-                    value={confiabilidade}
-                    disabled
-                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
-                  >
-                    <option>Selo ouro</option>
-                    <option>Selo prata</option>
-                    <option>Selo bronze</option>
-                    <option>Em verificacao</option>
-                  </select>
-                  <p className={helperClass}>Definido pelo sistema.</p>
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor="saidas" className={labelClass}>
-                    Saidas agendadas
+                  <label htmlFor="tempoEntrega" className={labelClass}>
+                    Tempo estimado de entrega
                   </label>
                   <input
-                    id="saidas"
-                    type="number"
-                    min="0"
-                    value={pedidosSaida}
-                    readOnly
-                    disabled
-                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
+                    id="tempoEntrega"
+                    value={tempoEntrega}
+                    onChange={(e) => setTempoEntrega(e.target.value)}
+                    className={`${inputBaseClass} border-gray-200`}
                   />
-                  <p className={helperClass}>Controlado pelo sistema.</p>
                 </div>
+                <div className="space-y-1">
+                  <label htmlFor="status" className={labelClass}>
+                    Status
+                  </label>
+                  <select
+                    id="status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className={`${inputBaseClass} border-gray-200`}
+                  >
+                    <option value="ativo">Ativo</option>
+                    <option value="inativo">Inativo</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label htmlFor="statusDetalhado" className={labelClass}>
+                    Status detalhado
+                  </label>
+                  <select
+                    id="statusDetalhado"
+                    value={statusDetalhado}
+                    onChange={(e) => setStatusDetalhado(e.target.value)}
+                    className={`${inputBaseClass} border-gray-200`}
+                  >
+                    <option value="em_formacao">Em formacao</option>
+                    <option value="aguardando_acesso">Aguardando acesso</option>
+                    <option value="ativo">Ativo</option>
+                    <option value="bloqueado">Bloqueado</option>
+                    <option value="finalizado">Finalizado</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="tipoGrupo" className={labelClass}>
+                    Tipo do grupo
+                  </label>
+                  <select
+                    id="tipoGrupo"
+                    value={tipoGrupo}
+                    onChange={(e) => setTipoGrupo(e.target.value)}
+                    className={`${inputBaseClass} border-gray-200`}
+                  >
+                    <option value="publico">Publico</option>
+                    <option value="privado">Privado</option>
+                    <option value="pre_cadastrado">Pre-cadastrado</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-800">
+                  <input type="checkbox" checked={servicoPreAssinado} onChange={(e) => setServicoPreAssinado(e.target.checked)} />
+                  Servico pre-assinado
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-800">
+                  <input type="checkbox" checked={envioAutomaticoAcesso} onChange={(e) => setEnvioAutomaticoAcesso(e.target.checked)} />
+                  Envio automatico de acesso
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-800">
+                  <input type="checkbox" checked={filaEsperaAtiva} onChange={(e) => setFilaEsperaAtiva(e.target.checked)} />
+                  Fila de espera ativa
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-800">
+                  <input type="checkbox" checked={necessitaAnalise} onChange={(e) => setNecessitaAnalise(e.target.checked)} />
+                  Necessita analise
+                </label>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="observacoesInternas" className={labelClass}>
+                  Observacoes internas
+                </label>
+                <textarea
+                  id="observacoesInternas"
+                  value={observacoesInternas}
+                  onChange={(e) => setObservacoesInternas(e.target.value)}
+                  className={`${inputBaseClass} border-gray-200`}
+                  rows={2}
+                />
               </div>
             </section>
 
@@ -579,9 +677,29 @@ export default function EditarGrupo({ grupo }) {
                 </h2>
               </div>
               <div className="space-y-3">
-                <p className="text-sm text-gray-600">Somente perfis cadastrados podem ingressar. O criador nao adiciona participantes manualmente.</p>
-                {grupo.participantesIds?.length ? (
-                  <p className="text-sm text-gray-700">{grupo.participantesIds.length} participante(s) vinculado(s).</p>
+                <p className="text-sm text-gray-600">Lista somente leitura. O administrador nao gerencia participantes por aqui.</p>
+                {participantes.length ? (
+                  <ul className="divide-y divide-gray-200 border border-gray-100 rounded-lg">
+                    {participantes.map((p, idx) => (
+                      <li key={p.userId || p._id || idx} className="flex items-center gap-3 p-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-sm font-semibold text-gray-700">
+                          {p.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.image} alt={p.nome || 'Participante'} className="w-full h-full object-cover" />
+                          ) : (
+                            (p.nome?.[0] || 'P').toUpperCase()
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900">{p.nome || 'Participante'}</p>
+                          <p className="text-xs text-gray-600">
+                            {p.email || 'Email nao informado'} • {p.status || 'ativo'}
+                          </p>
+                        </div>
+                        <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">{p.papel}</span>
+                      </li>
+                    ))}
+                  </ul>
                 ) : (
                   <p className="text-sm text-gray-500">Nenhum participante ainda.</p>
                 )}
@@ -667,7 +785,43 @@ export async function getServerSideProps({ params }) {
       return { notFound: true };
     }
     const grupo = await res.json();
-    return { props: { grupo } };
+
+    // Busca participantes (exceto admin) na colecao membrosGrupo
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB);
+    const participantes = await db
+      .collection('membrosGrupo')
+      .aggregate([
+        {
+          $match: {
+            grupoId: new ObjectId(id),
+            papel: { $ne: 'admin' },
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 0,
+            userId: '$userId',
+            papel: 1,
+            status: 1,
+            nome: { $ifNull: ['$user.nome', ''] },
+            email: { $ifNull: ['$user.email', ''] },
+            image: { $ifNull: ['$user.image', ''] },
+          },
+        },
+      ])
+      .toArray();
+
+    return { props: { grupo, participantes: JSON.parse(JSON.stringify(participantes)) } };
   } catch (error) {
     return { notFound: true };
   }

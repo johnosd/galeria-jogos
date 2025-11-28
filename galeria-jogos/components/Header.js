@@ -5,9 +5,14 @@ import { useSession, signOut } from 'next-auth/react';
 
 export default function Header({ admin = false, valorBusca = '', onBuscar = () => {} }) {
   const [menuAberto, setMenuAberto] = useState(false);
+  const [notificacoesAberto, setNotificacoesAberto] = useState(false);
+  const [notificacoes, setNotificacoes] = useState([]);
+  const [carregandoNotificacoes, setCarregandoNotificacoes] = useState(false);
   const { data: session, status } = useSession();
   const menuRef = useRef(null);
   const botaoMenuRef = useRef(null);
+  const notifRef = useRef(null);
+  const botaoNotifRef = useRef(null);
   const isLoadingSession = status === 'loading';
   const isAuthenticated = status === 'authenticated' && !!session;
   const userInitial = session?.user?.name?.[0]?.toUpperCase() || 'U';
@@ -27,12 +32,18 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
     const handleClickFora = (event) => {
       const clickForaMenu =
         menuRef.current && !menuRef.current.contains(event.target) && !botaoMenuRef.current?.contains(event.target);
+      const clickForaNotif =
+        notifRef.current && !notifRef.current.contains(event.target) && !botaoNotifRef.current?.contains(event.target);
 
       if (menuAberto && clickForaMenu) fecharMenu();
+      if (notificacoesAberto && clickForaNotif) setNotificacoesAberto(false);
     };
 
     const handleEsc = (event) => {
-      if (event.key === 'Escape') fecharMenu();
+      if (event.key === 'Escape') {
+        fecharMenu();
+        setNotificacoesAberto(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickFora);
@@ -42,7 +53,33 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
       document.removeEventListener('mousedown', handleClickFora);
       document.removeEventListener('keydown', handleEsc);
     };
-  }, [menuAberto]);
+  }, [menuAberto, notificacoesAberto]);
+
+  const carregarNotificacoes = async () => {
+    if (!isAuthenticated) return;
+    const userId =
+      session?.user?.id || session?.user?._id || session?.user?.sub || session?.user?.userId || session?.user?.uid;
+    if (!userId) return;
+    setCarregandoNotificacoes(true);
+    try {
+      const res = await fetch(`/api/notificacoes?userId=${encodeURIComponent(userId)}&lido=false`);
+      if (res.ok) {
+        const data = await res.json();
+        setNotificacoes(data || []);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar notificacoes', err);
+    }
+    setCarregandoNotificacoes(false);
+  };
+
+  const toggleNotificacoes = () => {
+    const proximo = !notificacoesAberto;
+    setNotificacoesAberto(proximo);
+    if (proximo) carregarNotificacoes();
+  };
+
+  const notificacoesNaoLidas = notificacoes.filter((n) => !n.lido).length;
 
   return (
     <header
@@ -119,8 +156,11 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
 
           <button
             type="button"
+            onClick={toggleNotificacoes}
+            ref={botaoNotifRef}
             className="hidden sm:flex items-center justify-center h-10 w-10 rounded-full bg-gray-800 border border-gray-700 hover:bg-gray-700 transition"
             aria-label="Ver notificacoes"
+            aria-expanded={notificacoesAberto}
           >
             <span className="relative">
               <svg
@@ -136,9 +176,37 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
                 <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 01-3.46 0" />
               </svg>
-              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500" aria-hidden />
+              {notificacoesNaoLidas > 0 && (
+                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500" aria-hidden />
+              )}
             </span>
           </button>
+
+          {notificacoesAberto && (
+            <div
+              ref={notifRef}
+              className="absolute right-16 mt-3 w-80 bg-gray-800 rounded-lg shadow-lg text-white z-[9999] py-2 border border-gray-700"
+            >
+              <div className="px-4 pb-2 text-xs uppercase tracking-wide text-gray-400 flex justify-between items-center">
+                <span>Notificacoes</span>
+                {carregandoNotificacoes && <span className="text-[10px] text-gray-500">Carregando...</span>}
+              </div>
+              {(!notificacoes || notificacoes.length === 0) && (
+                <p className="px-4 py-3 text-sm text-gray-300">Nenhuma notificacao.</p>
+              )}
+              {notificacoes?.map((notif) => (
+                <Link
+                  key={notif._id || notif.titulo}
+                  href={notif.acao === 'validar_conta' ? '/verificacao' : '#'}
+                  className="block px-4 py-3 hover:bg-gray-700"
+                  onClick={() => setNotificacoesAberto(false)}
+                >
+                  <p className="text-sm font-semibold">{notif.titulo}</p>
+                  <p className="text-xs text-gray-300 mt-1">{notif.mensagem}</p>
+                </Link>
+              ))}
+            </div>
+          )}
 
           {isLoadingSession && (
             <div className="hidden sm:block h-10 w-24 rounded bg-gray-800/70 animate-pulse" aria-hidden />

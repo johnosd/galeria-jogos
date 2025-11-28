@@ -1,5 +1,5 @@
 import clientPromise from '../../../lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { ObjectId, Int32, Double } from 'mongodb';
 
 const parseNumero = (valor, padrao = 0) => {
   const numero = Number(valor);
@@ -76,6 +76,14 @@ const normalizarPreco = (valor) => {
   return Number.isFinite(num) ? num : NaN;
 };
 
+const slugify = (text) =>
+  text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-');
+
 export default async function handler(req, res) {
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB);
@@ -99,6 +107,10 @@ export default async function handler(req, res) {
     try {
       const resultado = await db.collection('grupos').deleteOne({ _id: new ObjectId(id) });
       if (resultado.deletedCount === 0) return res.status(404).json({ error: 'Grupo nao encontrado' });
+
+      // Remove participantes associados ao grupo
+      await db.collection('membrosGrupo').deleteMany({ grupoId: new ObjectId(id) });
+
       return res.status(200).json({ message: 'Grupo excluido com sucesso' });
     } catch (error) {
       return res.status(500).json({ error: 'Erro ao excluir grupo' });
@@ -115,15 +127,24 @@ export default async function handler(req, res) {
     capa,
     imageUrl = '',
     imageKey = '',
-    preco,
+    valorTotal,
+    valorPorVaga,
     descricao = '',
     subtitulo = '',
-    acesso = '',
+    acesso = 'imediato',
     tempoEntrega = '',
     confiabilidade = '',
     capacidadeTotal,
-    membrosAtivos,
-    pedidosSaida,
+    vagasReservadasAdmin = 0,
+    vagasDisponiveis,
+    servicoPreAssinado = false,
+    envioAutomaticoAcesso = false,
+    filaEsperaAtiva = false,
+    necessitaAnalise = false,
+    observacoesInternas = '',
+    tipoGrupo = 'publico',
+    status = 'ativo',
+    statusDetalhado = 'em_formacao',
     beneficios,
     fidelidadePeriodo,
     fidelidadeRenovacao,
@@ -136,22 +157,40 @@ export default async function handler(req, res) {
     adminNome = '',
     adminAvatar = '',
     participantesIds = [],
-    status = 'ativo',
   } = req.body || {};
 
-  const precoNumero = normalizarPreco(preco);
-  const capacidadeNumero = parseNumero(capacidadeTotal);
-  const membrosNumero = Math.max(1, parseNumero(membrosAtivos, 1));
-  const pedidosNumero = parseNumero(pedidosSaida);
+  const valorTotalNumero = normalizarPreco(valorTotal);
+  const valorPorVagaNumero = normalizarPreco(valorPorVaga);
+  const capacidadeNumero = Math.trunc(parseNumero(capacidadeTotal));
+  const vagasReservadasNumero = Math.trunc(parseNumero(vagasReservadasAdmin));
   const adminId = typeof adminIdBody === 'string' && ObjectId.isValid(adminIdBody) ? new ObjectId(adminIdBody) : null;
   const adminIdString = typeof adminIdBody === 'string' ? adminIdBody : '';
   const participantesIdsParsed = parseObjectIds(participantesIds);
 
-  if (!nome || preco === undefined || !Number.isFinite(precoNumero)) {
-    return res.status(400).json({ error: 'Nome e preco validos sao obrigatorios' });
+  if (!nome) {
+    return res.status(400).json({ error: 'Nome e obrigatorio' });
+  }
+  if (!Number.isFinite(valorTotalNumero) || !Number.isFinite(valorPorVagaNumero)) {
+    return res.status(400).json({ error: 'Valor total e valor por vaga sao obrigatorios' });
+  }
+  if (!Number.isFinite(capacidadeNumero) || capacidadeNumero <= 0) {
+    return res.status(400).json({ error: 'Capacidade total deve ser maior que zero' });
+  }
+  if (!Number.isFinite(vagasReservadasNumero) || vagasReservadasNumero < 0) {
+    return res.status(400).json({ error: 'Vagas reservadas do admin deve ser zero ou mais' });
+  }
+  if (vagasReservadasNumero > capacidadeNumero) {
+    return res.status(400).json({ error: 'Vagas reservadas nao podem exceder a capacidade' });
+  }
+  if (!adminId) {
+    return res.status(400).json({ error: 'Administrador e obrigatorio para atualizar o grupo' });
   }
 
   const imagemFinal = imageUrl || capa || '';
+  const vagasDisponiveisNumero =
+    typeof vagasDisponiveis === 'number'
+      ? Math.trunc(parseNumero(vagasDisponiveis))
+      : Math.max(capacidadeNumero - vagasReservadasNumero, 0);
 
   try {
     const resultado = await db.collection('grupos').updateOne(
@@ -159,31 +198,39 @@ export default async function handler(req, res) {
       {
         $set: {
           nome,
+          slug: slugify(nome),
           capa: imagemFinal,
           imageUrl: imageUrl || imagemFinal,
           imageKey,
-          preco: precoNumero,
-          precoCentavos: Math.round(precoNumero * 100),
+          valorTotal: new Double(valorTotalNumero),
+          valorPorVaga: new Double(valorPorVagaNumero),
           descricao,
-          capacidadeTotal: capacidadeNumero,
-          membrosAtivos: membrosNumero,
-          pedidosSaida: pedidosNumero,
+          capacidadeTotal: new Int32(capacidadeNumero),
+          vagasReservadasAdmin: new Int32(vagasReservadasNumero),
+          vagasDisponiveis: new Int32(vagasDisponiveisNumero),
           subtitulo,
           acesso,
           tempoEntrega,
           confiabilidade,
+          tipoGrupo,
+          status,
+          statusDetalhado,
+          servicoPreAssinado: Boolean(servicoPreAssinado),
+          envioAutomaticoAcesso: Boolean(envioAutomaticoAcesso),
+          filaEsperaAtiva: Boolean(filaEsperaAtiva),
+          necessitaAnalise: Boolean(necessitaAnalise),
+          observacoesInternas: observacoesInternas || '',
           beneficios: parseLista(beneficios),
           fidelidade: parseFidelidade({ fidelidadePeriodo, fidelidadeRenovacao, fidelidadeObservacoes }),
           regras: parseLista(regras),
           faq: parseFaq(faq),
-          linkOficial: linkOficial?.trim() || null,
+          linkOficial: (linkOficial || '').trim(),
           adminId,
           adminIdString,
           adminEmail,
           adminNome,
           adminAvatar,
           participantesIds: participantesIdsParsed,
-          status,
           updatedAt: new Date(),
         },
       }
@@ -195,6 +242,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ message: 'Grupo atualizado com sucesso' });
   } catch (error) {
+    console.error('Erro ao atualizar grupo:', error?.errInfo || error);
+    if (error?.code === 121) {
+      return res.status(400).json({ error: 'Validacao do documento falhou', details: error.errInfo || null });
+    }
     return res.status(500).json({ error: 'Erro ao atualizar grupo' });
   }
 }

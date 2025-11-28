@@ -14,15 +14,23 @@ export default function NovoGrupo() {
   const [imagemFile, setImagemFile] = useState(null);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [imageKey, setImageKey] = useState('');
-  const [preco, setPreco] = useState('');
+  const [valorTotal, setValorTotal] = useState('');
+  const [valorPorVaga, setValorPorVaga] = useState('');
   const [descricao, setDescricao] = useState('');
   const [capacidadeTotal, setCapacidadeTotal] = useState('');
-  const [membrosAtivos, setMembrosAtivos] = useState('1');
-  const [pedidosSaida, setPedidosSaida] = useState('0');
+  const [vagasReservadasAdmin, setVagasReservadasAdmin] = useState('0');
   const [subtitulo, setSubtitulo] = useState('');
-  const [acesso, setAcesso] = useState('Convite');
+  const [acesso, setAcesso] = useState('imediato');
   const [tempoEntrega, setTempoEntrega] = useState('Ate 5 dias (geralmente mais rapido)');
   const [confiabilidade] = useState('Selo ouro');
+  const [tipoGrupo, setTipoGrupo] = useState('publico');
+  const [status, setStatus] = useState('ativo');
+  const [statusDetalhado, setStatusDetalhado] = useState('em_formacao');
+  const [servicoPreAssinado, setServicoPreAssinado] = useState(false);
+  const [envioAutomaticoAcesso, setEnvioAutomaticoAcesso] = useState(false);
+  const [filaEsperaAtiva, setFilaEsperaAtiva] = useState(false);
+  const [necessitaAnalise, setNecessitaAnalise] = useState(false);
+  const [observacoesInternas, setObservacoesInternas] = useState('');
   const [beneficios, setBeneficios] = useState([
     'Armazenamento 2 TB compartilhado',
     'Contas individuais preservam privacidade',
@@ -42,37 +50,28 @@ export default function NovoGrupo() {
     { pergunta: 'Com quem posso dividir assinaturas?', resposta: 'Apenas com membros aprovados pelo administrador do grupo.' },
   ]);
   const [linkOficial, setLinkOficial] = useState('https://one.google.com/');
-  const [adminNome, setAdminNome] = useState('');
-  const [adminAvatar, setAdminAvatar] = useState('');
   const [participantes] = useState([]);
   const [msg, setMsg] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [criando, setCriando] = useState(false);
   const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    if (!session?.user) return;
-    setAdminNome(session.user.nome || session.user.name || session.user.email || 'Administrador');
-    setAdminAvatar(session.user.image || '');
-  }, [session]);
-
   const vagasDisponiveis = useMemo(() => {
     const cap = Number(capacidadeTotal) || 0;
-    const ativos = Number(membrosAtivos) || 0;
-    return Math.max(cap - ativos, 0);
-  }, [capacidadeTotal, membrosAtivos]);
+    const reservadas = Number(vagasReservadasAdmin) || 0;
+    return Math.max(cap - reservadas, 0);
+  }, [capacidadeTotal, vagasReservadasAdmin]);
 
   const validarUrl = (url) => /^https?:\/\/[\w.-]+(\/[\w\-./?%&=]*)?$/.test(url.trim());
 
   const validateForm = () => {
     const novoErrors = {};
     if (!nome.trim()) novoErrors.nome = 'Nome e obrigatorio.';
-    if (!preco || Number.isNaN(Number(preco))) novoErrors.preco = 'Informe apenas numeros.';
+    if (!valorTotal || Number.isNaN(Number(valorTotal))) novoErrors.valorTotal = 'Informe o valor total.';
+    if (!valorPorVaga || Number.isNaN(Number(valorPorVaga))) novoErrors.valorPorVaga = 'Informe o valor por vaga.';
     const cap = Number(capacidadeTotal);
-    const ativos = Number(membrosAtivos);
     if (Number.isNaN(cap)) novoErrors.capacidadeTotal = 'Capacidade deve ser numero.';
-    if (Number.isNaN(ativos)) novoErrors.membrosAtivos = 'Membros ativos deve ser numero.';
-    if (!Number.isNaN(cap) && !Number.isNaN(ativos) && cap < ativos) novoErrors.membrosAtivos = 'Ativos nao podem exceder a capacidade.';
+    if (!Number.isNaN(cap) && cap <= 0) novoErrors.capacidadeTotal = 'Capacidade deve ser maior que zero.';
     if (!linkOficial || !validarUrl(linkOficial)) novoErrors.linkOficial = 'Informe uma URL valida (http/https).';
     const beneficiosValidos = beneficios.some((b) => b.trim());
     if (!beneficiosValidos) novoErrors.beneficios = 'Adicione pelo menos 1 beneficio.';
@@ -111,15 +110,23 @@ export default function NovoGrupo() {
 
     const payload = {
       nome,
+      tipoGrupo,
+      status,
+      statusDetalhado,
       capa,
       imageUrl: capa,
       imageKey,
-      preco: parseFloat(preco),
-      precoCentavos: Math.round(parseFloat(preco) * 100),
+      valorTotal: parseFloat(valorTotal),
+      valorPorVaga: parseFloat(valorPorVaga),
       descricao,
       capacidadeTotal: Number(capacidadeTotal) || 0,
-      membrosAtivos: 1,
-      pedidosSaida: Number(pedidosSaida) || 0,
+      vagasReservadasAdmin: Number(vagasReservadasAdmin) || 0,
+      vagasDisponiveis,
+      servicoPreAssinado,
+      envioAutomaticoAcesso,
+      filaEsperaAtiva,
+      necessitaAnalise,
+      observacoesInternas,
       subtitulo,
       acesso,
       tempoEntrega,
@@ -132,11 +139,7 @@ export default function NovoGrupo() {
       faq: faqText,
       linkOficial: linkOficial?.trim() || null,
       adminId,
-      adminEmail: session?.user?.email || '',
-      adminNome,
-      adminAvatar,
       participantesIds: [],
-      status: 'ativo',
     };
 
     try {
@@ -146,7 +149,10 @@ export default function NovoGrupo() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error('Erro ao criar grupo.');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Erro ao criar grupo.');
+      }
 
       const data = await res.json();
 
@@ -340,39 +346,45 @@ export default function NovoGrupo() {
                   Informações da assinatura
                 </h2>
               </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="preco" className={labelClass}>
-                    Mensalidade (R$) *
+                  <label htmlFor="valorTotal" className={labelClass}>
+                    Valor total (R$) *
                   </label>
                   <input
-                    id="preco"
+                    id="valorTotal"
                     type="number"
                     inputMode="decimal"
                     step="0.01"
                     aria-required="true"
-                    aria-invalid={!!errors.preco}
-                    value={preco}
-                    onChange={(e) => setPreco(e.target.value)}
-                    className={`${inputBaseClass} ${errors.preco ? 'border-red-500' : 'border-gray-200'}`}
+                    aria-invalid={!!errors.valorTotal}
+                    value={valorTotal}
+                    onChange={(e) => setValorTotal(e.target.value)}
+                    className={`${inputBaseClass} ${errors.valorTotal ? 'border-red-500' : 'border-gray-200'}`}
                   />
-                  <p className={helperClass}>Somente números. Ex.: 29.90</p>
-                  {errors.preco && <p className={errorClass}>{errors.preco}</p>}
+                  {errors.valorTotal && <p className={errorClass}>{errors.valorTotal}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="tempoEntrega" className={labelClass}>
-                    Tempo estimado de entrega
+                  <label htmlFor="valorPorVaga" className={labelClass}>
+                    Valor por vaga (R$) *
                   </label>
                   <input
-                    id="tempoEntrega"
-                    value={tempoEntrega}
-                    onChange={(e) => setTempoEntrega(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    id="valorPorVaga"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    aria-required="true"
+                    aria-invalid={!!errors.valorPorVaga}
+                    value={valorPorVaga}
+                    onChange={(e) => setValorPorVaga(e.target.value)}
+                    className={`${inputBaseClass} ${errors.valorPorVaga ? 'border-red-500' : 'border-gray-200'}`}
                   />
-                  <p className={helperClass}>Ex.: Ate 5 dias (geralmente mais rapido).</p>
+                  {errors.valorPorVaga && <p className={errorClass}>{errors.valorPorVaga}</p>}
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label htmlFor="capacidade" className={labelClass}>
                     Capacidade total *
@@ -390,25 +402,22 @@ export default function NovoGrupo() {
                   {errors.capacidadeTotal && <p className={errorClass}>{errors.capacidadeTotal}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="ativos" className={labelClass}>
-                    Membros ativos *
+                  <label htmlFor="vagasReservadasAdmin" className={labelClass}>
+                    Vagas reservadas (admin)
                   </label>
                   <input
-                    id="ativos"
+                    id="vagasReservadasAdmin"
                     type="number"
                     min="0"
-                    aria-required="true"
-                    aria-invalid={!!errors.membrosAtivos}
-                    value={membrosAtivos}
-                    readOnly
-                    className={`${inputBaseClass} bg-gray-50 ${errors.membrosAtivos ? 'border-red-500' : 'border-gray-200'}`}
+                    value={vagasReservadasAdmin}
+                    onChange={(e) => setVagasReservadasAdmin(e.target.value)}
+                    className={`${inputBaseClass} border-gray-200`}
                   />
-                  <p className={helperClass}>Sempre inicia com 1 (administrador).</p>
-                  {errors.membrosAtivos && <p className={errorClass}>{errors.membrosAtivos}</p>}
+                  <p className={helperClass}>Reserva do admin dentro da capacidade.</p>
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="vagas" className={labelClass}>
-                    Vagas disponíveis
+                    Vagas disponiveis
                   </label>
                   <input
                     id="vagas"
@@ -417,10 +426,10 @@ export default function NovoGrupo() {
                     className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                     aria-readonly="true"
                   />
-                  <p className={helperClass}>Calculado automaticamente (capacidade - ativos).</p>
+                  <p className={helperClass}>Calculado (capacidade - vagas reservadas).</p>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label htmlFor="acesso" className={labelClass}>
                     Tipo de acesso
@@ -431,10 +440,8 @@ export default function NovoGrupo() {
                     onChange={(e) => setAcesso(e.target.value)}
                     className={`${inputBaseClass} border-gray-200`}
                   >
-                    <option>Convite</option>
-                    <option>Acesso imediato</option>
-                    <option>Fila</option>
-                    <option>Pre-cadastro</option>
+                    <option value="imediato">Acesso imediato</option>
+                    <option value="apos_completar">Apos completar vagas</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -453,21 +460,6 @@ export default function NovoGrupo() {
                     <option>Em verificacao</option>
                   </select>
                   <p className={helperClass}>Definido automaticamente pelo sistema.</p>
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor="saidas" className={labelClass}>
-                    Saídas agendadas
-                  </label>
-                  <input
-                    id="saidas"
-                    type="number"
-                    min="0"
-                    value={pedidosSaida}
-                    readOnly
-                    disabled
-                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
-                  />
-                  <p className={helperClass}>Campo controlado pelo sistema.</p>
                 </div>
               </div>
             </section>

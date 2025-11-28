@@ -46,31 +46,34 @@ export default function GruposAdmin() {
           <thead>
             <tr className="bg-gray-200">
               <th className="border px-4 py-2">Nome</th>
-              <th className="border px-4 py-2">Mensalidade</th>
-              <th className="border px-4 py-2">Membros</th>
-              <th className="border px-4 py-2">Vagas/Fila</th>
+              <th className="border px-4 py-2">Valor por vaga</th>
+              <th className="border px-4 py-2">Capacidade</th>
+              <th className="border px-4 py-2">Vagas (disp/reserv.)</th>
+              <th className="border px-4 py-2">Status</th>
               <th className="border px-4 py-2">Acoes</th>
             </tr>
           </thead>
           <tbody>
             {grupos.map((grupo) => {
-              const capacidadeBase = grupo.capacidadeTotal ?? grupo.membrosAtivos ?? 0;
-              const capacidade = Number.isFinite(Number(capacidadeBase)) && Number(capacidadeBase) > 0 ? Number(capacidadeBase) : 0;
-              const membros = Number(grupo.membrosAtivos ?? 0);
-              const pedidos = Number(grupo.pedidosSaida ?? 0);
-              const capacidadeUtil = capacidade || membros;
-              const vagas = Math.max(capacidadeUtil - membros, 0);
-              const fila = Math.max(pedidos - vagas, 0);
+              const capacidade = Number(grupo.capacidadeTotal) || 0;
+              const reservadas = Number(grupo.vagasReservadasAdmin) || 0;
+              const vagasDisponiveisCalc =
+                typeof grupo.vagasDisponiveis === 'number' ? grupo.vagasDisponiveis : Math.max(capacidade - reservadas, 0);
+              const statusLabel = grupo.status === 'inativo' ? 'Inativo' : 'Ativo';
+              const statusDetalhado = grupo.statusDetalhado || '';
+              const valorPorVaga = Number(grupo.valorPorVaga) || 0;
 
               return (
                 <tr key={grupo._id}>
                   <td className="border px-4 py-2">{grupo.nome}</td>
-                  <td className="border px-4 py-2">R$ {Number(grupo.preco).toFixed(2)}</td>
+                  <td className="border px-4 py-2">R$ {valorPorVaga.toFixed(2)}</td>
+                  <td className="border px-4 py-2">{capacidade}</td>
+                  <td className="border px-4 py-2">{vagasDisponiveisCalc} / {reservadas}</td>
                   <td className="border px-4 py-2">
-                    {membros}/{capacidadeUtil || 0}
-                  </td>
-                  <td className="border px-4 py-2">
-                    {vagas} vagas / {fila} fila
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${grupo.status === 'inativo' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                      {statusLabel}
+                    </span>
+                    {statusDetalhado ? <span className="ml-2 text-xs text-gray-600">({statusDetalhado})</span> : null}
                   </td>
                   <td className="border px-4 py-2 text-center space-x-2">
                     <Link href={`/admin/grupos/${grupo._id}`} className="text-blue-600 hover:underline">

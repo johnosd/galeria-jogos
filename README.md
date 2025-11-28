@@ -59,9 +59,12 @@ R2_PUBLIC_BASE_URL=https://pub-xxxx.r2.dev
 Rodar o script de setup (usa `.env.local` para `MONGODB_URI` e `MONGODB_DB`):
 ```bash
 cd galeria-jogos
+# instale dependencias (inclui dotenv usado pelo script)
+npm install
 node database/setupDatabase.js
 ```
 Ele cria/atualiza colecoes `grupos`, `users`, `membrosGrupo` com validacao de schema e indexes (slug unico, email/username unicos, relacoes grupoId/userId).
+O script tambem provisiona `logsAcessoGrupo`, `transacoes`, `saques` e `verificationCodes` com validacao e indexes (inclui TTL em `verificationCodes.expiresAt`).
 
 ## Executar
 - Desenvolvimento: `npm run dev` e acesse http://localhost:3000

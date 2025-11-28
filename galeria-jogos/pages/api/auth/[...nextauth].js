@@ -1,7 +1,7 @@
 // pages/api/auth/[...nextauth].js
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { MongoClient } from "mongodb";
+import clientPromise from "../../../lib/mongodb";
 
 export const authOptions = {
   providers: [
@@ -17,7 +17,7 @@ export const authOptions = {
         token.name = user.name;
         token.image = user.image;
 
-        const client = await MongoClient.connect(process.env.MONGODB_URI);
+        const client = await clientPromise;
         const db = client.db(process.env.MONGODB_DB);
         const usuario = await db.collection("users").findOne({ email: user.email });
 
@@ -27,18 +27,39 @@ export const authOptions = {
           token.sobrenome = usuario.sobrenome || "";
           token.telefone = usuario.telefone || "";
           token.username = usuario.username || "";
+
+          // Cria notificacao de validacao se estiver pendente
+          if (!usuario.contaValidada) {
+            const jaNotificado = await db.collection("notificacoesUsuario").findOne({
+              userId: usuario._id,
+              acao: "validar_conta",
+              lido: { $in: [false, null] },
+            });
+            if (!jaNotificado) {
+              await db.collection("notificacoesUsuario").insertOne({
+                userId: usuario._id,
+                titulo: "Confirme seu e-mail",
+                mensagem: "Sua conta ainda não está validada. Clique para finalizar a verificação.",
+                tipo: "sistema",
+                acao: "validar_conta",
+                lido: false,
+                importante: true,
+                data: new Date(),
+                dataLido: null,
+                expiraEm: null,
+              });
+            }
+          }
         } else {
           token.newUser = true;
           token.contaValidada = false;
         }
-
-        await client.close();
       }
       return token;
     },
 
     async session({ session, token }) {
-      const client = await MongoClient.connect(process.env.MONGODB_URI);
+      const client = await clientPromise;
       const db = client.db(process.env.MONGODB_DB);
       const usuario = await db.collection("users").findOne({ email: token.email });
 
@@ -52,7 +73,6 @@ export const authOptions = {
       session.user.newUser = token.newUser || false;
       session.user.contaValidada = usuario?.contaValidada || false;
 
-      await client.close();
       return session;
     },
   },

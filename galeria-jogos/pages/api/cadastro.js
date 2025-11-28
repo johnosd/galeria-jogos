@@ -1,5 +1,5 @@
 // pages/api/cadastro.js
-import { MongoClient } from "mongodb";
+import clientPromise from "../../lib/mongodb";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -27,22 +27,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const client = await MongoClient.connect(process.env.MONGODB_URI);
+    const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB);
 
     const existingUser = await db.collection("users").findOne({ email: emailLimpo });
     if (existingUser) {
-      client.close();
       return res.status(409).json({ message: "Usuario ja existe." });
     }
 
     const existingUsername = await db.collection("users").findOne({ username: usernameLimpo });
     if (existingUsername) {
-      client.close();
       return res.status(409).json({ message: "Nome de usuario ja esta em uso." });
     }
 
-    await db.collection("users").insertOne({
+    const resultado = await db.collection("users").insertOne({
       nome: nomeLimpo,
       sobrenome: sobrenomeLimpo,
       email: emailLimpo,
@@ -53,7 +51,24 @@ export default async function handler(req, res) {
       createdAt: new Date(),
     });
 
-    client.close();
+    // Notificacao para validar conta
+    try {
+      await db.collection("notificacoesUsuario").insertOne({
+        userId: resultado.insertedId,
+        titulo: "Confirme seu e-mail",
+        mensagem: "Valide sua conta para aproveitar todos os recursos. Clique para ir à página de verificação.",
+        tipo: "sistema",
+        acao: "validar_conta",
+        lido: false,
+        importante: true,
+        data: new Date(),
+        dataLido: null,
+        expiraEm: null,
+      });
+    } catch (notifyError) {
+      console.error("Erro ao criar notificacao de validacao:", notifyError);
+    }
+
     return res.status(201).json({ message: "Usuario cadastrado com sucesso!" });
   } catch (error) {
     console.error(error);

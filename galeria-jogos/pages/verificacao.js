@@ -30,10 +30,11 @@ export default function Verificacao() {
       });
 
       if (response.ok) {
-        setMensagem("Código enviado com sucesso!");
+        setMensagem("Codigo enviado com sucesso!");
         setEnviado(true);
       } else {
-        setErro("Erro ao enviar o código.");
+        const data = await response.json().catch(() => ({}));
+        setErro(data.message || "Erro ao enviar o codigo.");
       }
     } catch {
       setErro("Erro ao comunicar com o servidor.");
@@ -51,7 +52,7 @@ export default function Verificacao() {
       const response = await fetch("/api/verifyEmail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo, email: session.user.email }),
+        body: JSON.stringify({ codigo: codigo.trim(), email: session.user.email }),
       });
 
       if (response.ok) {
@@ -59,10 +60,11 @@ export default function Verificacao() {
         await signIn("google", { redirect: false }); // Atualiza a sessão
         router.push("/");
       } else {
-        setErro("Código inválido ou expirado.");
+        const data = await response.json().catch(() => ({}));
+        setErro(data.message || "Codigo invalido ou expirado.");
       }
     } catch {
-      setErro("Erro ao verificar o código.");
+      setErro("Erro ao verificar o codigo.");
     }
   };
 
@@ -87,13 +89,13 @@ export default function Verificacao() {
             className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition mb-4"
             disabled={loading}
           >
-            {loading ? "Enviando..." : "Enviar Código"}
+            {loading ? "Enviando..." : "Enviar codigo"}
           </button>
         ) : (
           <form onSubmit={verificarCodigo}>
             <input
               type="text"
-              placeholder="Digite o código"
+              placeholder="Digite o codigo"
               value={codigo}
               onChange={(e) => setCodigo(e.target.value)}
               className="w-full p-3 mb-4 border rounded"
@@ -103,7 +105,7 @@ export default function Verificacao() {
                 type="submit"
                 className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
               >
-                Verificar Código
+                Verificar codigo
               </button>
               <button
                 type="button"

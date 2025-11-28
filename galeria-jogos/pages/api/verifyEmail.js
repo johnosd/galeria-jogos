@@ -1,53 +1,48 @@
 // pages/api/verifyEmail.js
-import { MongoClient } from "mongodb";
+import clientPromise from "../../lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ message: "Método não permitido" });
+    return res.status(405).json({ message: "Metodo nao permitido" });
   }
 
-  const { email, codigo } = req.body;
-
+  const { email, codigo } = req.body || {};
   if (!email || !codigo) {
-    return res.status(400).json({ message: "E-mail e código são obrigatórios." });
+    return res.status(400).json({ message: "E-mail e codigo sao obrigatorios." });
   }
 
   try {
-    const client = await MongoClient.connect(process.env.MONGODB_URI);
+    const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB);
+    const now = new Date();
 
-    // Busca o código de verificação mais recente
-    const record = await db
-      .collection("verificationCodes")
-      .findOne({ email }, { sort: { expirationTime: -1 } });
-
-    if (!record) {
-      await client.close();
-      return res.status(400).json({ message: "Código não encontrado." });
-    }
-
-    const now = Date.now();
-
-    if (record.codigo !== codigo) {
-      await client.close();
-      return res.status(400).json({ message: "Código incorreto." });
-    }
-
-    if (now > record.expirationTime) {
-      await client.close();
-      return res.status(400).json({ message: "Código expirado." });
-    }
-
-    // Atualiza a conta como validada
-    await db.collection("users").updateOne(
-      { email },
-      { $set: { contaValidada: true } }
+    const record = await db.collection("verificationCodes").findOne(
+      { email, tipo: "validacao_cadastro", status: "pendente" },
+      { sort: { createdAt: -1 } }
     );
 
-    // Remove o código utilizado
-    await db.collection("verificationCodes").deleteMany({ email });
+    if (!record) {
+      return res.status(400).json({ message: "Codigo nao encontrado." });
+    }
 
-    await client.close();
+    if (record.expiresAt && now > new Date(record.expiresAt)) {
+      await db.collection("verificationCodes").updateOne({ _id: record._id }, { $set: { status: "expirado" } });
+      return res.status(400).json({ message: "Codigo expirado." });
+    }
+
+    if (record.codigo !== codigo) {
+      await db
+        .collection("verificationCodes")
+        .updateOne({ _id: record._id }, { $inc: { tentativas: 1 } });
+      return res.status(400).json({ message: "Codigo incorreto." });
+    }
+
+    await db.collection("users").updateOne({ email }, { $set: { contaValidada: true } });
+    await db
+      .collection("verificationCodes")
+      .updateOne({ _id: record._id }, { $set: { status: "usado", usedAt: now, tentativas: record.tentativas + 1 } });
+
     return res.status(200).json({ message: "Conta validada com sucesso." });
   } catch (error) {
     console.error("Erro ao validar e-mail:", error);
