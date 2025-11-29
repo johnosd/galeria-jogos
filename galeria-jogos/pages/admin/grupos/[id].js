@@ -9,6 +9,16 @@ const labelClass = 'text-sm font-semibold text-gray-800 flex items-center gap-2'
 const sectionClass = 'bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100 space-y-4';
 const errorClass = 'text-xs text-red-600 mt-1';
 const helperClass = 'text-xs text-gray-500 mt-1';
+const categoriasDisponiveis = [
+  { id: 'jogos', label: 'Jogos', icon: '🎮' },
+  { id: 'aplicativos', label: 'Aplicativos', icon: '📱' },
+  { id: 'assinaturas', label: 'Assinaturas', icon: '🧾' },
+  { id: 'cursos', label: 'Cursos', icon: '📚' },
+];
+const acessosDisponiveis = [
+  { id: 'imediato', label: 'Acesso imediato', icon: '⚡' },
+  { id: 'apos_completar', label: 'Apos completar vagas', icon: '⏳' },
+];
 
 const parseLista = (valor, fallback = []) => {
   if (Array.isArray(valor)) return valor;
@@ -67,6 +77,7 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
   const [tempoEntrega, setTempoEntrega] = useState(grupo.tempoEntrega || 'Ate 5 dias (geralmente mais rapido)');
   const [confiabilidade] = useState(grupo.confiabilidade || 'Selo ouro');
   const [tipoGrupo, setTipoGrupo] = useState(grupo.tipoGrupo || 'publico');
+  const [categoria, setCategoria] = useState(grupo.categoria || 'jogos');
   const [status, setStatus] = useState(grupo.status || 'ativo');
   const [statusDetalhado, setStatusDetalhado] = useState(grupo.statusDetalhado || 'em_formacao');
   const [servicoPreAssinado, setServicoPreAssinado] = useState(Boolean(grupo.servicoPreAssinado));
@@ -112,6 +123,7 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
     if (!faq.length || faq.some((i) => !i.pergunta.trim() || !i.resposta.trim())) novoErrors.faq = 'FAQ precisa de pergunta e resposta.';
     if (!subtitulo.trim()) novoErrors.subtitulo = 'Subtitulo e obrigatorio.';
     if (!descricao.trim()) novoErrors.descricao = 'Descricao e obrigatoria.';
+    if (!categoria) novoErrors.categoria = 'Escolha uma categoria.';
     setErrors(novoErrors);
     return Object.keys(novoErrors).length === 0;
   };
@@ -167,6 +179,7 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
       acesso,
       tempoEntrega,
       confiabilidade,
+      categoria,
       tipoGrupo,
       status,
       statusDetalhado,
@@ -328,6 +341,39 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
               </div>
             </section>
 
+            <section className={sectionClass} aria-labelledby="categoria-heading">
+              <div className="flex items-center gap-2">
+                <h2 id="categoria-heading" className="text-lg font-semibold text-gray-900">
+                  Categoria do grupo *
+                </h2>
+              </div>
+              <p className={helperClass}>Escolha uma categoria (somente uma por grupo).</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {categoriasDisponiveis.map((item) => {
+                  const selecionado = categoria === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setCategoria(item.id)}
+                      className={`flex flex-col items-center justify-center gap-2 border rounded-lg p-3 text-sm font-semibold transition ${
+                        selecionado
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                          : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+                      }`}
+                      aria-pressed={selecionado}
+                    >
+                      <span className="text-2xl" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.categoria && <p className={errorClass}>{errors.categoria}</p>}
+            </section>
+
             <section className={sectionClass} aria-labelledby="assinatura-heading">
               <div className="flex items-center gap-2">
                 <h2 id="assinatura-heading" className="text-lg font-semibold text-gray-900">
@@ -423,18 +469,31 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="acesso" className={labelClass}>
-                    Tipo de acesso
-                  </label>
-                  <select
-                    id="acesso"
-                    value={acesso}
-                    onChange={(e) => setAcesso(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
-                  >
-                    <option value="imediato">Envio imediato</option>
-                    <option value="apos_completar">Apos completar grupo</option>
-                  </select>
+                  <label className={labelClass}>Tipo de acesso</label>
+                  <p className={helperClass}>Escolha como o acesso sera liberado.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {acessosDisponiveis.map((item) => {
+                      const selecionado = acesso === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setAcesso(item.id)}
+                          className={`flex flex-col items-center justify-center gap-2 border rounded-lg p-3 text-sm font-semibold transition ${
+                            selecionado
+                              ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                              : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+                          }`}
+                          aria-pressed={selecionado}
+                        >
+                          <span className="text-2xl" aria-hidden="true">
+                            {item.icon}
+                          </span>
+                          <span className="text-center leading-tight">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="tempoEntrega" className={labelClass}>

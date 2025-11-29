@@ -73,7 +73,15 @@
         "finalizado"
       ]
     },
-
+    "categoria": {
+      "bsonType": "string",
+      "enum": [
+        "jogos",
+        "aplicativos",
+        "assinaturas",
+        "cursos"
+      ]
+    },
     "filaEsperaAtiva": { "bsonType": "bool" },
     "dataAtivacao": { "bsonType": ["date", "null"] },
 

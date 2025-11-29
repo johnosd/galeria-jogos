@@ -84,6 +84,8 @@ const slugify = (text) =>
     .replace(/[^\w\s-]/g, '')
     .replace(/\s+/g, '-');
 
+const CATEGORIAS_PERMITIDAS = ['jogos', 'aplicativos', 'assinaturas', 'cursos'];
+
 export default async function handler(req, res) {
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB);
@@ -97,7 +99,54 @@ export default async function handler(req, res) {
     try {
       const grupo = await db.collection('grupos').findOne({ _id: new ObjectId(id) });
       if (!grupo) return res.status(404).json({ error: 'Grupo nao encontrado' });
-      return res.status(200).json(grupo);
+
+      // Traz dados do administrador a partir de membrosGrupo e users (fallback no documento do grupo)
+      let adminIdResolved = null;
+      if (grupo.adminId && ObjectId.isValid(grupo.adminId)) adminIdResolved = grupo.adminId;
+      if (!adminIdResolved && grupo.adminIdString && ObjectId.isValid(grupo.adminIdString)) adminIdResolved = new ObjectId(grupo.adminIdString);
+
+      // Busca o membro admin do grupo
+      const membroAdmin = await db
+        .collection('membrosGrupo')
+        .findOne({ grupoId: new ObjectId(id), papel: 'admin' });
+
+      if (!adminIdResolved && membroAdmin?.userId) adminIdResolved = membroAdmin.userId;
+
+      let adminUser = null;
+      if (adminIdResolved && ObjectId.isValid(String(adminIdResolved))) {
+        adminUser = await db.collection('users').findOne(
+          { _id: new ObjectId(adminIdResolved) },
+          { projection: { name: 1, nome: 1, email: 1, image: 1, avatar: 1 } }
+        );
+      }
+
+      const adminNome =
+        adminUser?.name ||
+        adminUser?.nome ||
+        grupo.adminNome ||
+        membroAdmin?.nome ||
+        adminUser?.email ||
+        grupo.admin?.nome ||
+        'Administrador';
+      const adminEmail = adminUser?.email || grupo.adminEmail || '';
+      const adminAvatar = adminUser?.image || adminUser?.avatar || grupo.adminAvatar || '';
+
+      const resposta = {
+        ...grupo,
+        adminId: adminIdResolved || grupo.adminId || null,
+        adminIdString: adminIdResolved ? String(adminIdResolved) : grupo.adminIdString || null,
+        adminNome,
+        adminEmail,
+        adminAvatar,
+        admin: {
+          id: adminIdResolved ? String(adminIdResolved) : grupo.adminIdString || null,
+          nome: adminNome,
+          email: adminEmail,
+          avatar: adminAvatar,
+        },
+      };
+
+      return res.status(200).json(resposta);
     } catch (error) {
       return res.status(500).json({ error: 'Erro ao buscar grupo' });
     }
@@ -135,6 +184,7 @@ export default async function handler(req, res) {
     tempoEntrega = '',
     confiabilidade = '',
     capacidadeTotal,
+    categoria = '',
     vagasReservadasAdmin = 0,
     vagasDisponiveis,
     servicoPreAssinado = false,
@@ -185,6 +235,9 @@ export default async function handler(req, res) {
   if (!adminId) {
     return res.status(400).json({ error: 'Administrador e obrigatorio para atualizar o grupo' });
   }
+  if (!categoria || !CATEGORIAS_PERMITIDAS.includes(categoria)) {
+    return res.status(400).json({ error: 'Categoria invalida' });
+  }
 
   const imagemFinal = imageUrl || capa || '';
   const vagasDisponiveisNumero =
@@ -212,6 +265,7 @@ export default async function handler(req, res) {
           acesso,
           tempoEntrega,
           confiabilidade,
+          categoria,
           tipoGrupo,
           status,
           statusDetalhado,

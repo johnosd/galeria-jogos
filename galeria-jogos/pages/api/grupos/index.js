@@ -84,6 +84,8 @@ const slugify = (text) =>
     .replace(/[^\w\s-]/g, '')
     .replace(/\s+/g, '-');
 
+const CATEGORIAS_PERMITIDAS = ['jogos', 'aplicativos', 'assinaturas', 'cursos'];
+
 export default async function handler(req, res) {
   try {
     const client = await clientPromise;
@@ -112,6 +114,7 @@ export default async function handler(req, res) {
       tempoEntrega = '',
       confiabilidade = '',
       capacidadeTotal,
+      categoria = '',
       vagasReservadasAdmin = 0,
       vagasDisponiveis,
       servicoPreAssinado = false,
@@ -159,6 +162,9 @@ export default async function handler(req, res) {
     if (vagasReservadasNumero > capacidadeNumero) {
       return res.status(400).json({ error: 'Vagas reservadas nao podem exceder a capacidade' });
     }
+    if (!categoria || !CATEGORIAS_PERMITIDAS.includes(categoria)) {
+      return res.status(400).json({ error: 'Categoria invalida' });
+    }
 
     const imagemFinal = imageUrl || capa || '';
     const vagasDisponiveisNumero =
@@ -187,6 +193,7 @@ export default async function handler(req, res) {
       acesso,
       tempoEntrega,
       confiabilidade,
+      categoria,
       tipoGrupo,
       status,
       statusDetalhado,

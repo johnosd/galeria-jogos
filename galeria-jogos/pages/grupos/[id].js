@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { FaWhatsapp, FaUsers, FaClock, FaShieldAlt, FaCrown, FaCheckCircle, FaExternalLinkAlt } from 'react-icons/fa';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import clientPromise from '../../lib/mongodb';
+import { ObjectId } from 'mongodb';
 import Header from '../../components/Header';
 
 const DEFAULT_CONTENT = {
@@ -50,24 +52,49 @@ const DEFAULT_CONTENT = {
   linkOficial: 'https://one.google.com/',
 };
 
+const parseNumero = (valor, padrao = NaN) => {
+  if (valor === null || valor === undefined) return padrao;
+  if (typeof valor === 'object' && ('$numberDouble' in valor || '$numberDecimal' in valor)) {
+    const raw = valor.$numberDouble || valor.$numberDecimal;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : padrao;
+  }
+  const num = Number(valor);
+  return Number.isFinite(num) ? num : padrao;
+};
+
 function calcularStatusGrupo(grupo) {
-  const capacidadeBase = grupo.capacidadeTotal ?? grupo.membrosAtivos ?? DEFAULT_CONTENT.vagas.total;
-  const capacidadeNum = Number(capacidadeBase);
-  const membrosAtivos = Number(grupo.membrosAtivos ?? DEFAULT_CONTENT.vagas.ocupadas);
-  const capacidade = Number.isFinite(capacidadeNum) && capacidadeNum > 0 ? capacidadeNum : membrosAtivos;
-  const vagasDisponiveis = Math.max(capacidade - membrosAtivos, 0);
+  const capacidadeNum = parseNumero(grupo.capacidadeTotal);
+  const vagasReservadas = parseNumero(grupo.vagasReservadasAdmin);
+  const vagasDisponiveisCampo = parseNumero(grupo.vagasDisponiveis);
+
+  const capacidade = Number.isFinite(capacidadeNum) && capacidadeNum > 0
+    ? capacidadeNum
+    : Number.isFinite(vagasDisponiveisCampo)
+    ? vagasDisponiveisCampo + Math.max(Number.isFinite(vagasReservadas) ? vagasReservadas : 1, 1)
+    : DEFAULT_CONTENT.vagas.total;
+  const vagasDisponiveisCalculada = Math.max(
+    capacidade - (Number.isFinite(vagasReservadas) && vagasReservadas >= 0 ? vagasReservadas : 1),
+    0
+  );
+  const vagasDisponiveis = Number.isFinite(vagasDisponiveisCampo) && vagasDisponiveisCampo >= 0 ? vagasDisponiveisCampo : vagasDisponiveisCalculada;
+  const membrosAtivos = Math.max(capacidade - vagasDisponiveis, 0);
   return { capacidade, membrosAtivos, vagasDisponiveis };
 }
 
 export default function GrupoDetalhe({ grupo }) {
   const dados = grupo || {};
   const grupoId = dados._id || dados.id || '';
+  const { data: session } = useSession();
   const [userId, setUserId] = useState('');
   const [jaMembro, setJaMembro] = useState(false);
   const { capacidade, membrosAtivos, vagasDisponiveis } = useMemo(() => calcularStatusGrupo(dados), [dados]);
 
   const nome = dados.nome || DEFAULT_CONTENT.nome;
-  const preco = Number.isFinite(Number(dados.preco)) ? Number(dados.preco) : DEFAULT_CONTENT.preco;
+  const valorPorVagaNumero = parseNumero(dados.valorPorVaga);
+  const precoNumeroFallback = parseNumero(dados.preco);
+  const precoCalculado = Number.isFinite(valorPorVagaNumero) ? valorPorVagaNumero : Number.isFinite(precoNumeroFallback) ? precoNumeroFallback : NaN;
+  const preco = Number.isFinite(precoCalculado) ? precoCalculado : DEFAULT_CONTENT.preco;
   const descricao = dados.descricao || DEFAULT_CONTENT.descricao;
   const capa = dados.imageUrl || dados.capa || '';
 
@@ -80,8 +107,13 @@ export default function GrupoDetalhe({ grupo }) {
   const regras = Array.isArray(dados.regras) && dados.regras.length ? dados.regras : DEFAULT_CONTENT.regras;
   const faq = Array.isArray(dados.faq) && dados.faq.length ? dados.faq : DEFAULT_CONTENT.faq;
   const linkOficial = dados.linkOficial || DEFAULT_CONTENT.linkOficial;
-  const adminNome = dados.adminNome || dados.admin?.nome || DEFAULT_CONTENT.admin.nome;
-  const adminAvatar = dados.adminAvatar || dados.admin?.avatar || DEFAULT_CONTENT.admin.avatar;
+  const adminNome =
+    dados.adminNome ||
+    dados.admin?.nome ||
+    dados.admin?.name ||
+    dados.admin?.email ||
+    DEFAULT_CONTENT.admin.nome;
+  const adminAvatar = dados.adminAvatar || dados.admin?.avatar || dados.admin?.image || DEFAULT_CONTENT.admin.avatar;
   const adminSelos = Array.isArray(dados.adminSelos)
     ? dados.adminSelos
     : Array.isArray(dados.admin?.selos) && dados.admin?.selos.length
@@ -101,12 +133,18 @@ export default function GrupoDetalhe({ grupo }) {
       : DEFAULT_CONTENT.participantes;
 
   useEffect(() => {
+    const sessionId =
+      session?.user?.id || session?.user?._id || session?.user?.sub || session?.user?.email || null;
+    if (sessionId) {
+      setUserId(String(sessionId));
+      return;
+    }
     if (typeof window === 'undefined') return;
     const existing = localStorage.getItem('client-user-id');
     const id = existing || `client-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
     if (!existing) localStorage.setItem('client-user-id', id);
     setUserId(id);
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (!userId) return;
@@ -114,6 +152,16 @@ export default function GrupoDetalhe({ grupo }) {
     const flag = grupoId ? localStorage.getItem(`grupo-joined-${grupoId}`) : null;
     setJaMembro(Boolean(found || flag));
   }, [userId, participantes, grupoId]);
+
+  const isAdmin = useMemo(() => {
+    if (!userId || !participantes.length) return false;
+    const sessionEmail = session?.user?.email;
+    return participantes.some(
+      (p) =>
+        p.papel === 'admin' &&
+        ((p.userId && p.userId === userId) || (sessionEmail && p.email && p.email === sessionEmail))
+    );
+  }, [userId, participantes, session]);
 
   const whatsappLink = `https://wa.me/5511997383948?text=${encodeURIComponent(
     `Ola! Quero entrar no grupo de assinatura: ${nome}`
@@ -178,14 +226,20 @@ export default function GrupoDetalhe({ grupo }) {
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <Link
-                    href={whatsappLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full font-semibold shadow-lg hover:bg-blue-700 transition"
-                  >
-                    <FaWhatsapp /> Entrar no grupo
-                  </Link>
+                  {jaMembro || isAdmin ? (
+                    <div className="flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold shadow bg-gray-300 text-gray-600">
+                      <FaWhatsapp /> {jaMembro ? 'Voce ja participa' : 'Administrador do grupo'}
+                    </div>
+                  ) : (
+                    <Link
+                      href={whatsappLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full font-semibold shadow-lg hover:bg-blue-700 transition"
+                    >
+                      <FaWhatsapp /> Entrar no grupo
+                    </Link>
+                  )}
                   <Link href="/" className="text-blue-700 font-semibold hover:underline">
                     Ver outros grupos
                   </Link>
@@ -221,17 +275,18 @@ export default function GrupoDetalhe({ grupo }) {
                   <Badge text="CTA em destaque" variant="info" />
                 </div>
                 <p className="text-sm text-gray-700">Pagamento mensal, renovacao automatica e acompanhamento do acesso pelo administrador.</p>
-                <Link
-                  href={jaMembro ? '#' : `/assinatura/relacionamento${flowQuery}`}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow transition ${
-                    jaMembro
-                      ? 'bg-gray-300 text-gray-600 cursor-not-allowed pointer-events-none'
-                      : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
-                  aria-disabled={jaMembro}
-                >
-                  <FaWhatsapp /> {jaMembro ? 'Voce ja participa' : 'Assinar'}
-                </Link>
+                {jaMembro || isAdmin ? (
+                  <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-gray-300 text-gray-600">
+                    <FaWhatsapp /> {jaMembro ? 'Voce ja participa' : 'Administrador do grupo'}
+                  </div>
+                ) : (
+                  <Link
+                    href={`/assinatura/relacionamento${flowQuery}`}
+                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-green-600 text-white hover:bg-green-700"
+                  >
+                    <FaWhatsapp /> Assinar
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -368,14 +423,20 @@ export default function GrupoDetalhe({ grupo }) {
             <p className="text-xs text-gray-600">Entrar no grupo</p>
             <p className="text-lg font-bold text-gray-900">R$ {preco.toFixed(2)}/mes</p>
           </div>
-          <Link
-            href={whatsappLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-full font-semibold shadow hover:bg-blue-700 transition"
-          >
-            <FaWhatsapp /> Entrar
-          </Link>
+          {jaMembro || isAdmin ? (
+            <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-full font-semibold shadow bg-gray-300 text-gray-600">
+              <FaWhatsapp /> {jaMembro ? 'Voce ja participa' : 'Administrador do grupo'}
+            </div>
+          ) : (
+            <Link
+              href={whatsappLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-full font-semibold shadow hover:bg-blue-700 transition"
+            >
+              <FaWhatsapp /> Entrar
+            </Link>
+          )}
         </div>
       </div>
     </>
@@ -426,14 +487,75 @@ function Badge({ text, variant = 'info' }) {
 export async function getServerSideProps({ params }) {
   const { id } = params;
 
+  if (!ObjectId.isValid(id)) {
+    return { notFound: true };
+  }
+
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/grupos/${id}`);
-    if (!res.ok) {
-      return { props: { grupo: null } };
-    }
-    const grupo = await res.json();
-    return { props: { grupo } };
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB);
+
+    const grupoDoc = await db.collection('grupos').findOne({ _id: new ObjectId(id) });
+    if (!grupoDoc) return { notFound: true };
+
+    const membros = await db
+      .collection('membrosGrupo')
+      .aggregate([
+        { $match: { grupoId: new ObjectId(id) } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            papel: 1,
+            status: 1,
+            userId: 1,
+            nome: { $ifNull: ['$user.name', '$user.nome'] },
+            email: '$user.email',
+            avatar: { $ifNull: ['$user.image', '$user.avatar'] },
+          },
+        },
+      ])
+      .toArray();
+
+    const adminMember = membros.find((m) => m.papel === 'admin');
+    const adminNome =
+      adminMember?.nome ||
+      grupoDoc.adminNome ||
+      adminMember?.email ||
+      grupoDoc.admin?.nome ||
+      'Administrador';
+    const adminEmail = adminMember?.email || grupoDoc.adminEmail || '';
+    const adminAvatar = adminMember?.avatar || grupoDoc.adminAvatar || '';
+
+    const participantes = membros
+      .filter((m) => m.status !== 'banido')
+      .map((m, idx) => ({
+        nome: m.nome || m.email || `Membro ${idx + 1}`,
+        avatar: m.avatar || `https://i.pravatar.cc/120?img=${(idx % 70) + 1}`,
+        userId: m.userId ? String(m.userId) : undefined,
+        email: m.email || undefined,
+        status: m.status,
+        papel: m.papel,
+      }));
+
+    const grupo = {
+      ...grupoDoc,
+      adminNome,
+      adminEmail,
+      adminAvatar,
+      participantes,
+    };
+
+    return { props: { grupo: JSON.parse(JSON.stringify(grupo)) } };
   } catch (error) {
+    console.error('Erro ao carregar grupo:', error);
     return { props: { grupo: null } };
   }
 }

@@ -17,13 +17,13 @@ export default function NovoGrupo() {
   const [valorTotal, setValorTotal] = useState('');
   const [valorPorVaga, setValorPorVaga] = useState('');
   const [descricao, setDescricao] = useState('');
-  const [capacidadeTotal, setCapacidadeTotal] = useState('');
-  const [vagasReservadasAdmin, setVagasReservadasAdmin] = useState('0');
+  const [capacidadeTotal, setCapacidadeTotal] = useState('2');
   const [subtitulo, setSubtitulo] = useState('');
   const [acesso, setAcesso] = useState('imediato');
   const [tempoEntrega, setTempoEntrega] = useState('Ate 5 dias (geralmente mais rapido)');
   const [confiabilidade] = useState('Selo ouro');
   const [tipoGrupo, setTipoGrupo] = useState('publico');
+  const [categoria, setCategoria] = useState('jogos');
   const [status, setStatus] = useState('ativo');
   const [statusDetalhado, setStatusDetalhado] = useState('em_formacao');
   const [servicoPreAssinado, setServicoPreAssinado] = useState(false);
@@ -56,22 +56,52 @@ export default function NovoGrupo() {
   const [criando, setCriando] = useState(false);
   const [errors, setErrors] = useState({});
 
+  const VAGAS_RESERVADAS_ADMIN = 1;
   const vagasDisponiveis = useMemo(() => {
-    const cap = Number(capacidadeTotal) || 0;
-    const reservadas = Number(vagasReservadasAdmin) || 0;
-    return Math.max(cap - reservadas, 0);
-  }, [capacidadeTotal, vagasReservadasAdmin]);
+    const cap = Number(capacidadeTotal);
+    if (Number.isNaN(cap)) return 0;
+    return Math.max(cap - VAGAS_RESERVADAS_ADMIN, 0);
+  }, [capacidadeTotal]);
+
+  useEffect(() => {
+    if (!valorTotal) {
+      setValorPorVaga('');
+      return;
+    }
+    const totalNumero = Number(valorTotal);
+    const capacidadeNumero = Number(capacidadeTotal);
+    const divisor = Number.isNaN(capacidadeNumero) ? 0 : capacidadeNumero;
+    if (Number.isNaN(totalNumero) || totalNumero <= 0 || divisor <= 0) {
+      setValorPorVaga('');
+      return;
+    }
+    const calculado = totalNumero / divisor;
+    if (!Number.isFinite(calculado) || calculado <= 0) {
+      setValorPorVaga('');
+      return;
+    }
+    setValorPorVaga(calculado.toFixed(2));
+  }, [valorTotal, capacidadeTotal]);
 
   const validarUrl = (url) => /^https?:\/\/[\w.-]+(\/[\w\-./?%&=]*)?$/.test(url.trim());
 
   const validateForm = () => {
     const novoErrors = {};
     if (!nome.trim()) novoErrors.nome = 'Nome e obrigatorio.';
-    if (!valorTotal || Number.isNaN(Number(valorTotal))) novoErrors.valorTotal = 'Informe o valor total.';
-    if (!valorPorVaga || Number.isNaN(Number(valorPorVaga))) novoErrors.valorPorVaga = 'Informe o valor por vaga.';
+    if (!categoria) novoErrors.categoria = 'Escolha uma categoria.';
+    const valorTotalNumero = Number(valorTotal);
+    if (!valorTotal || Number.isNaN(valorTotalNumero) || valorTotalNumero <= 0)
+      novoErrors.valorTotal = 'Informe o valor total da assinatura.';
     const cap = Number(capacidadeTotal);
-    if (Number.isNaN(cap)) novoErrors.capacidadeTotal = 'Capacidade deve ser numero.';
-    if (!Number.isNaN(cap) && cap <= 0) novoErrors.capacidadeTotal = 'Capacidade deve ser maior que zero.';
+    if (Number.isNaN(cap)) {
+      novoErrors.capacidadeTotal = 'Capacidade deve ser numero.';
+    } else if (cap < 2) {
+      novoErrors.capacidadeTotal = 'Capacidade minima de 2 (1 admin + 1 membro).';
+    }
+    const valorPorVagaNumero = Number(valorPorVaga);
+    if (!valorPorVaga || Number.isNaN(valorPorVagaNumero) || valorPorVagaNumero <= 0) {
+      novoErrors.valorPorVaga = 'Valor por vaga e calculado (valor total / capacidade total). Confira valor total e capacidade.';
+    }
     if (!linkOficial || !validarUrl(linkOficial)) novoErrors.linkOficial = 'Informe uma URL valida (http/https).';
     const beneficiosValidos = beneficios.some((b) => b.trim());
     if (!beneficiosValidos) novoErrors.beneficios = 'Adicione pelo menos 1 beneficio.';
@@ -120,7 +150,7 @@ export default function NovoGrupo() {
       valorPorVaga: parseFloat(valorPorVaga),
       descricao,
       capacidadeTotal: Number(capacidadeTotal) || 0,
-      vagasReservadasAdmin: Number(vagasReservadasAdmin) || 0,
+      vagasReservadasAdmin: VAGAS_RESERVADAS_ADMIN,
       vagasDisponiveis,
       servicoPreAssinado,
       envioAutomaticoAcesso,
@@ -131,6 +161,7 @@ export default function NovoGrupo() {
       acesso,
       tempoEntrega,
       confiabilidade,
+      categoria,
       beneficios: beneficiosText,
       fidelidadePeriodo,
       fidelidadeRenovacao,
@@ -223,6 +254,16 @@ export default function NovoGrupo() {
   const sectionClass = 'bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100 space-y-4';
   const errorClass = 'text-xs text-red-600 mt-1';
   const helperClass = 'text-xs text-gray-500 mt-1';
+  const categoriasDisponiveis = [
+    { id: 'jogos', label: 'Jogos', icon: '🎮' },
+    { id: 'aplicativos', label: 'Aplicativos', icon: '📱' },
+    { id: 'assinaturas', label: 'Assinaturas', icon: '🧾' },
+    { id: 'cursos', label: 'Cursos', icon: '📚' },
+  ];
+  const acessosDisponiveis = [
+    { id: 'imediato', label: 'Acesso imediato', icon: '⚡' },
+    { id: 'apos_completar', label: 'Apos completar vagas', icon: '⏳' },
+  ];
   return (
     <>
       <Header admin />
@@ -337,6 +378,42 @@ export default function NovoGrupo() {
               </div>
             </section>
 
+            <section className={sectionClass} aria-labelledby="categoria-heading">
+              <div className="flex items-center gap-2">
+                <span role="img" aria-hidden="true">
+                  🏷️
+                </span>
+                <h2 id="categoria-heading" className="text-lg font-semibold text-gray-900">
+                  Categoria do grupo *
+                </h2>
+              </div>
+              <p className={helperClass}>Escolha uma categoria. Apenas uma pode ser selecionada.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {categoriasDisponiveis.map((item) => {
+                  const selecionado = categoria === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setCategoria(item.id)}
+                      className={`flex flex-col items-center justify-center gap-2 border rounded-lg p-3 text-sm font-semibold transition ${
+                        selecionado
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                          : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+                      }`}
+                      aria-pressed={selecionado}
+                    >
+                      <span className="text-2xl" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.categoria && <p className={errorClass}>{errors.categoria}</p>}
+            </section>
+
             <section className={sectionClass} aria-labelledby="assinatura-heading">
               <div className="flex items-center gap-2">
                 <span role="img" aria-hidden="true">
@@ -377,9 +454,12 @@ export default function NovoGrupo() {
                     aria-required="true"
                     aria-invalid={!!errors.valorPorVaga}
                     value={valorPorVaga}
-                    onChange={(e) => setValorPorVaga(e.target.value)}
-                    className={`${inputBaseClass} ${errors.valorPorVaga ? 'border-red-500' : 'border-gray-200'}`}
+                    readOnly
+                    aria-readonly="true"
+                    placeholder="Calculado automaticamente"
+                    className={`${inputBaseClass} ${errors.valorPorVaga ? 'border-red-500' : 'border-gray-200 bg-gray-50'}`}
                   />
+                  <p className={helperClass}>Calculado automaticamente: valor total / capacidade total (inclui vaga do admin).</p>
                   {errors.valorPorVaga && <p className={errorClass}>{errors.valorPorVaga}</p>}
                 </div>
               </div>
@@ -392,13 +472,14 @@ export default function NovoGrupo() {
                   <input
                     id="capacidade"
                     type="number"
-                    min="0"
+                    min="2"
                     aria-required="true"
                     aria-invalid={!!errors.capacidadeTotal}
                     value={capacidadeTotal}
                     onChange={(e) => setCapacidadeTotal(e.target.value)}
                     className={`${inputBaseClass} ${errors.capacidadeTotal ? 'border-red-500' : 'border-gray-200'}`}
                   />
+                  <p className={helperClass}>Minimo 2 vagas: 1 do administrador + ao menos 1 para membro.</p>
                   {errors.capacidadeTotal && <p className={errorClass}>{errors.capacidadeTotal}</p>}
                 </div>
                 <div className="space-y-1">
@@ -408,12 +489,13 @@ export default function NovoGrupo() {
                   <input
                     id="vagasReservadasAdmin"
                     type="number"
-                    min="0"
-                    value={vagasReservadasAdmin}
-                    onChange={(e) => setVagasReservadasAdmin(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    min="1"
+                    value={VAGAS_RESERVADAS_ADMIN}
+                    readOnly
+                    aria-readonly="true"
+                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                   />
-                  <p className={helperClass}>Reserva do admin dentro da capacidade.</p>
+                  <p className={helperClass}>Sempre 1 vaga destinada ao administrador.</p>
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="vagas" className={labelClass}>
@@ -426,40 +508,36 @@ export default function NovoGrupo() {
                     className={`${inputBaseClass} border-gray-200 bg-gray-50`}
                     aria-readonly="true"
                   />
-                  <p className={helperClass}>Calculado (capacidade - vagas reservadas).</p>
+                  <p className={helperClass}>Calculado (capacidade total - vaga do administrador).</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="acesso" className={labelClass}>
-                    Tipo de acesso
-                  </label>
-                  <select
-                    id="acesso"
-                    value={acesso}
-                    onChange={(e) => setAcesso(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
-                  >
-                    <option value="imediato">Acesso imediato</option>
-                    <option value="apos_completar">Apos completar vagas</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor="confiabilidade" className={labelClass}>
-                    Confiabilidade / selo
-                  </label>
-                  <select
-                    id="confiabilidade"
-                    value={confiabilidade}
-                    disabled
-                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
-                  >
-                    <option>Selo ouro</option>
-                    <option>Selo prata</option>
-                    <option>Selo bronze</option>
-                    <option>Em verificacao</option>
-                  </select>
-                  <p className={helperClass}>Definido automaticamente pelo sistema.</p>
+                  <label className={labelClass}>Tipo de acesso</label>
+                  <p className={helperClass}>Escolha como o acesso sera liberado.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {acessosDisponiveis.map((item) => {
+                      const selecionado = acesso === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setAcesso(item.id)}
+                          className={`flex flex-col items-center justify-center gap-2 border rounded-lg p-3 text-sm font-semibold transition ${
+                            selecionado
+                              ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                              : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+                          }`}
+                          aria-pressed={selecionado}
+                        >
+                          <span className="text-2xl" aria-hidden="true">
+                            {item.icon}
+                          </span>
+                          <span className="text-center leading-tight">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </section>
@@ -621,37 +699,6 @@ export default function NovoGrupo() {
                 {errors.linkOficial && <p className={errorClass}>{errors.linkOficial}</p>}
               </div>
             </section>
-
-            
-
-            
-            <section className={sectionClass} aria-labelledby="participantes-heading">
-              <div className="flex items-center gap-2">
-                <span role="img" aria-hidden="true">
-                  ????????
-                </span>
-                <h2 id="participantes-heading" className="text-lg font-semibold text-gray-900">
-                  Participantes
-                </h2>
-              </div>
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600">Somente perfis cadastrados podem ingressar. O criador nao adiciona participantes manualmente.</p>
-                {participantes.length ? (
-                  <div className="flex flex-wrap gap-3">
-                    {participantes.map((p, idx) => (
-                      <div key={`participante-${idx}`} className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={p.avatar} alt={`Avatar de ${p.nome}`} className="w-8 h-8 rounded-full" />
-                        <span className="text-sm">{p.nome}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Nenhum participante ainda.</p>
-                )}
-              </div>
-            </section>
-
 
             <section className={sectionClass} aria-labelledby="faq-heading">
               <div className="flex items-center gap-2">
