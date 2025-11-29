@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../../components/Header';
 import clientPromise from '../../../lib/mongodb';
@@ -68,7 +68,7 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
   const [uploadingImg, setUploadingImg] = useState(false);
   const [imageKey, setImageKey] = useState(grupo.imageKey || '');
   const [valorTotal] = useState(grupo.valorTotal ?? '');
-  const [valorPorVaga] = useState(grupo.valorPorVaga ?? '');
+  const [valorPorVaga, setValorPorVaga] = useState(grupo.valorPorVaga ?? '');
   const [descricao, setDescricao] = useState(grupo.descricao || '');
   const [capacidadeTotal, setCapacidadeTotal] = useState(grupo.capacidadeTotal ?? '');
   const [vagasReservadasAdmin, setVagasReservadasAdmin] = useState(grupo.vagasReservadasAdmin ?? 1);
@@ -104,6 +104,19 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
     return Math.max(cap - reservadas, 0);
   }, [capacidadeTotal, vagasReservadasAdmin]);
 
+  useEffect(() => {
+    const totalNumero = Number(valorTotal);
+    const capNumero = Number(capacidadeTotal);
+    const reservadasNumero = Number(vagasReservadasAdmin);
+    const vagasMembros = capNumero - reservadasNumero;
+    if (!Number.isFinite(totalNumero) || totalNumero <= 0 || !Number.isFinite(vagasMembros) || vagasMembros <= 0) {
+      setValorPorVaga('');
+      return;
+    }
+    const calculado = totalNumero / vagasMembros;
+    setValorPorVaga(calculado.toFixed(2));
+  }, [valorTotal, capacidadeTotal, vagasReservadasAdmin]);
+
   const validarUrl = (url) => /^https?:\/\/[\w.-]+(\/[\w\-./?%&=]*)?$/.test((url || '').trim());
 
   const validateForm = () => {
@@ -116,7 +129,15 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
     if (!Number.isNaN(cap) && cap <= 0) novoErrors.capacidadeTotal = 'Capacidade deve ser maior que zero.';
     const reservadas = Number(vagasReservadasAdmin);
     if (Number.isNaN(reservadas) || reservadas < 0) novoErrors.vagasReservadasAdmin = 'Vagas reservadas deve ser zero ou mais.';
-    if (!Number.isNaN(reservadas) && !Number.isNaN(cap) && reservadas > cap) novoErrors.vagasReservadasAdmin = 'Reservadas nao podem exceder a capacidade.';
+    if (!Number.isNaN(reservadas) && !Number.isNaN(cap)) {
+      if (reservadas >= cap) {
+        novoErrors.vagasReservadasAdmin = 'Reservadas nao podem ser iguais ou maiores que a capacidade.';
+      } else if (cap - reservadas <= 0) {
+        novoErrors.vagasDisponiveis = 'Vagas disponiveis devem ser maiores que zero.';
+      } else if (cap - reservadas < 1) {
+        novoErrors.vagasReservadasAdmin = 'Deixe pelo menos 1 vaga para membros.';
+      }
+    }
     if (!linkOficial || !validarUrl(linkOficial)) novoErrors.linkOficial = 'Informe uma URL valida (http/https).';
     if (!beneficios.length) novoErrors.beneficios = 'Adicione pelo menos 1 beneficio.';
     if (!regras.length) novoErrors.regras = 'Adicione pelo menos 1 regra.';
@@ -444,13 +465,13 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                     id="reservadas"
                     type="number"
                     min="1"
-                    max={Number(capacidadeTotal) || undefined}
+                    max={Math.max((Number(capacidadeTotal) || 0) - 1, 1)}
                     aria-invalid={!!errors.vagasReservadasAdmin}
                     value={vagasReservadasAdmin}
                     onChange={(e) => setVagasReservadasAdmin(e.target.value)}
                     className={`${inputBaseClass} ${errors.vagasReservadasAdmin ? 'border-red-500' : 'border-gray-200'}`}
                   />
-                  <p className={helperClass}>1 vaga sempre do admin; se houver vagas, ele pode reservar mais.</p>
+                  <p className={helperClass}>Admin pode reservar mais vagas desde que reste ao menos 1 vaga para membros.</p>
                   {errors.vagasReservadasAdmin && <p className={errorClass}>{errors.vagasReservadasAdmin}</p>}
                 </div>
                 <div className="space-y-1">
@@ -461,10 +482,11 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                     id="vagas"
                     value={vagasDisponiveis}
                     readOnly
-                    className={`${inputBaseClass} border-gray-200 bg-gray-50`}
+                    className={`${inputBaseClass} ${errors.vagasDisponiveis ? 'border-red-500' : 'border-gray-200'} bg-gray-50`}
                     aria-readonly="true"
                   />
                   <p className={helperClass}>Capacidade - vagas reservadas.</p>
+                  {errors.vagasDisponiveis && <p className={errorClass}>{errors.vagasDisponiveis}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
