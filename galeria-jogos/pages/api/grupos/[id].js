@@ -58,17 +58,6 @@ const parseFidelidade = (body = {}) => {
   return { periodoMeses, renovacaoAutomatica, observacoes, proximaRenovacao };
 };
 
-const parseObjectIds = (valor) => {
-  if (!Array.isArray(valor)) return [];
-  return valor
-    .map((v) => {
-      if (typeof v === 'string' && ObjectId.isValid(v)) return new ObjectId(v);
-      if (v?._id && ObjectId.isValid(v._id)) return new ObjectId(v._id);
-      return null;
-    })
-    .filter(Boolean);
-};
-
 const normalizarPreco = (valor) => {
   if (valor === undefined || valor === null) return NaN;
   const str = String(valor).replace(',', '.').trim();
@@ -130,6 +119,9 @@ export default async function handler(req, res) {
         'Administrador';
       const adminEmail = adminUser?.email || grupo.adminEmail || '';
       const adminAvatar = adminUser?.image || adminUser?.avatar || grupo.adminAvatar || '';
+      const membrosAtivos = await db
+        .collection('membrosGrupo')
+        .countDocuments({ grupoId: new ObjectId(id), status: { $ne: 'banido' } });
 
       const resposta = {
         ...grupo,
@@ -138,6 +130,7 @@ export default async function handler(req, res) {
         adminNome,
         adminEmail,
         adminAvatar,
+        membrosAtivos,
         admin: {
           id: adminIdResolved ? String(adminIdResolved) : grupo.adminIdString || null,
           nome: adminNome,
@@ -202,21 +195,12 @@ export default async function handler(req, res) {
     regras,
     faq,
     linkOficial = '',
-    adminId: adminIdBody = '',
-    adminEmail = '',
-    adminNome = '',
-    adminAvatar = '',
-    participantesIds = [],
   } = req.body || {};
 
   const valorTotalNumero = normalizarPreco(valorTotal);
   const valorPorVagaNumero = normalizarPreco(valorPorVaga);
   const capacidadeNumero = Math.trunc(parseNumero(capacidadeTotal));
   const vagasReservadasNumero = Math.trunc(parseNumero(vagasReservadasAdmin));
-  const adminId = typeof adminIdBody === 'string' && ObjectId.isValid(adminIdBody) ? new ObjectId(adminIdBody) : null;
-  const adminIdString = typeof adminIdBody === 'string' ? adminIdBody : '';
-  const participantesIdsParsed = parseObjectIds(participantesIds);
-
   if (!nome) {
     return res.status(400).json({ error: 'Nome e obrigatorio' });
   }
@@ -231,9 +215,6 @@ export default async function handler(req, res) {
   }
   if (vagasReservadasNumero > capacidadeNumero) {
     return res.status(400).json({ error: 'Vagas reservadas nao podem exceder a capacidade' });
-  }
-  if (!adminId) {
-    return res.status(400).json({ error: 'Administrador e obrigatorio para atualizar o grupo' });
   }
   if (!categoria || !CATEGORIAS_PERMITIDAS.includes(categoria)) {
     return res.status(400).json({ error: 'Categoria invalida' });
@@ -279,12 +260,6 @@ export default async function handler(req, res) {
           regras: parseLista(regras),
           faq: parseFaq(faq),
           linkOficial: (linkOficial || '').trim(),
-          adminId,
-          adminIdString,
-          adminEmail,
-          adminNome,
-          adminAvatar,
-          participantesIds: participantesIdsParsed,
           updatedAt: new Date(),
         },
       }

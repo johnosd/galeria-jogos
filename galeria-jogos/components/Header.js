@@ -154,6 +154,15 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
             </Link>
           )}
 
+          {isAuthenticated && (
+            <Link
+              href="/meus-grupos"
+              className="hidden sm:inline-flex items-center gap-2 bg-gray-800 border border-gray-700 hover:bg-gray-700 px-4 py-2 rounded text-white font-semibold transition"
+            >
+              Meus grupos
+            </Link>
+          )}
+
           <button
             type="button"
             onClick={toggleNotificacoes}

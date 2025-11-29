@@ -79,7 +79,6 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
   const [tipoGrupo, setTipoGrupo] = useState(grupo.tipoGrupo || 'publico');
   const [categoria, setCategoria] = useState(grupo.categoria || 'jogos');
   const [status, setStatus] = useState(grupo.status || 'ativo');
-  const [statusDetalhado, setStatusDetalhado] = useState(grupo.statusDetalhado || 'em_formacao');
   const [servicoPreAssinado, setServicoPreAssinado] = useState(Boolean(grupo.servicoPreAssinado));
   const [envioAutomaticoAcesso, setEnvioAutomaticoAcesso] = useState(Boolean(grupo.envioAutomaticoAcesso));
   const [filaEsperaAtiva, setFilaEsperaAtiva] = useState(Boolean(grupo.filaEsperaAtiva));
@@ -103,6 +102,17 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
     const reservadas = Number(vagasReservadasAdmin) || 0;
     return Math.max(cap - reservadas, 0);
   }, [capacidadeTotal, vagasReservadasAdmin]);
+
+  const statusDetalhadoCalculado = useMemo(() => {
+    const capNumero = Number(capacidadeTotal) || 0;
+    const membrosAtivos = Number(grupo.membrosAtivos ?? 0);
+    const vagasDisponiveisGrupo = Number(grupo.vagasDisponiveis ?? 0);
+    const ocupacaoEstimativa = capNumero - (Number.isFinite(vagasDisponiveisGrupo) ? vagasDisponiveisGrupo : 0);
+    const ocupacao = Number.isFinite(membrosAtivos) && membrosAtivos > 0 ? membrosAtivos : ocupacaoEstimativa;
+    if (acesso === 'imediato') return 'ativo';
+    if (acesso === 'apos_completar' && capNumero > 0 && ocupacao >= capNumero) return 'ativo';
+    return 'em_formacao';
+  }, [acesso, capacidadeTotal, grupo.membrosAtivos, grupo.vagasDisponiveis]);
 
   useEffect(() => {
     const totalNumero = Number(valorTotal);
@@ -203,7 +213,7 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
       categoria,
       tipoGrupo,
       status,
-      statusDetalhado,
+      statusDetalhado: statusDetalhadoCalculado,
       servicoPreAssinado,
       envioAutomaticoAcesso,
       filaEsperaAtiva,
@@ -544,23 +554,6 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label htmlFor="statusDetalhado" className={labelClass}>
-                    Status detalhado
-                  </label>
-                  <select
-                    id="statusDetalhado"
-                    value={statusDetalhado}
-                    onChange={(e) => setStatusDetalhado(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
-                  >
-                    <option value="em_formacao">Em formacao</option>
-                    <option value="aguardando_acesso">Aguardando acesso</option>
-                    <option value="ativo">Ativo</option>
-                    <option value="bloqueado">Bloqueado</option>
-                    <option value="finalizado">Finalizado</option>
-                  </select>
-                </div>
                 <div className="space-y-1">
                   <label htmlFor="tipoGrupo" className={labelClass}>
                     Tipo do grupo

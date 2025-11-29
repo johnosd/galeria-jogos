@@ -120,7 +120,10 @@ export default function NovoGrupo() {
     setMsg('');
     setSucesso('');
     const valido = validateForm();
-    if (!valido) return;
+    if (!valido) {
+      setMsg('Corrija os campos destacados antes de continuar.');
+      return;
+    }
     setCriando(true);
     const beneficiosText = beneficios.map((b) => b.trim()).filter(Boolean).join('\n');
     const fidelidadeText = [
@@ -477,6 +480,12 @@ export default function NovoGrupo() {
                     aria-invalid={!!errors.capacidadeTotal}
                     value={capacidadeTotal}
                     onChange={(e) => setCapacidadeTotal(e.target.value)}
+                    onBlur={() => {
+                      const numero = Number(capacidadeTotal);
+                      if (Number.isNaN(numero) || numero < 2) {
+                        setCapacidadeTotal('2');
+                      }
+                    }}
                     className={`${inputBaseClass} ${errors.capacidadeTotal ? 'border-red-500' : 'border-gray-200'}`}
                   />
                   <p className={helperClass}>Minimo 2 vagas: 1 do administrador + ao menos 1 para membro.</p>
@@ -760,6 +769,7 @@ export default function NovoGrupo() {
                   className="w-full bg-green-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-green-700 transition disabled:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                   disabled={criando}
                   aria-busy={criando}
+                  aria-disabled={criando}
                 >
                   {criando ? 'Criando...' : 'Criar grupo'}
                 </button>

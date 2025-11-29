@@ -108,3 +108,6 @@ O script tambem provisiona `logsAcessoGrupo`, `transacoes`, `saques` e `verifica
 
 ## Instruçoes GPT
 - Pergunte o que for necessário para iniciar uma tarefa
+- Aproveite o desenvolvimento e me ensine um pouco para que eu possa aprender enquanto vamos fazendo
+- aplique boas praticas de desenvolvimento
+- sempre cheque os database/schemas e se precisar de alguma alteracao me avise

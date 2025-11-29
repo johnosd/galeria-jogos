@@ -58,17 +58,6 @@ const parseFidelidade = (body = {}) => {
   return { periodoMeses, renovacaoAutomatica, observacoes, proximaRenovacao };
 };
 
-const parseObjectIds = (valor) => {
-  if (!Array.isArray(valor)) return [];
-  return valor
-    .map((v) => {
-      if (typeof v === 'string' && ObjectId.isValid(v)) return new ObjectId(v);
-      if (v?._id && ObjectId.isValid(v._id)) return new ObjectId(v._id);
-      return null;
-    })
-    .filter(Boolean);
-};
-
 const normalizarPreco = (valor) => {
   if (valor === undefined || valor === null) return NaN;
   const str = String(valor).replace(',', '.').trim();
@@ -92,7 +81,50 @@ export default async function handler(req, res) {
     const db = client.db(process.env.MONGODB_DB);
 
     if (req.method === 'GET') {
-      const grupos = await db.collection('grupos').find({}).toArray();
+      const grupos = await db
+        .collection('grupos')
+        .aggregate([
+          {
+            $lookup: {
+              from: 'membrosGrupo',
+              localField: '_id',
+              foreignField: 'grupoId',
+              as: 'membros',
+            },
+          },
+          {
+            $addFields: {
+              membrosAtivos: {
+                $size: {
+                  $filter: {
+                    input: '$membros',
+                    as: 'm',
+                    cond: { $ne: ['$$m.status', 'banido'] },
+                  },
+                },
+              },
+              participantes: {
+                $map: {
+                  input: {
+                    $filter: {
+                      input: '$membros',
+                      as: 'm',
+                      cond: { $ne: ['$$m.status', 'banido'] },
+                    },
+                  },
+                  as: 'm',
+                  in: {
+                    userId: { $toString: '$$m.userId' },
+                    papel: '$$m.papel',
+                    status: '$$m.status',
+                  },
+                },
+              },
+            },
+          },
+          { $project: { membros: 0 } },
+        ])
+        .toArray();
       return res.status(200).json(grupos);
     }
 
@@ -133,10 +165,6 @@ export default async function handler(req, res) {
       faq,
       linkOficial = '',
       adminId: adminIdBody = '',
-      adminEmail = '',
-      adminNome = '',
-      adminAvatar = '',
-      participantesIds = [],
     } = req.body || {};
 
     const valorTotalNumero = normalizarPreco(valorTotal);
@@ -144,8 +172,6 @@ export default async function handler(req, res) {
     const capacidadeNumero = Math.trunc(parseNumero(capacidadeTotal));
     const vagasReservadasNumero = Math.trunc(parseNumero(vagasReservadasAdmin));
     const adminId = typeof adminIdBody === 'string' && ObjectId.isValid(adminIdBody) ? new ObjectId(adminIdBody) : null;
-    const adminIdString = typeof adminIdBody === 'string' ? adminIdBody : '';
-    const participantesIdsParsed = parseObjectIds(participantesIds);
 
     if (!nome) {
       return res.status(400).json({ error: 'Nome e obrigatorio' });
@@ -164,6 +190,9 @@ export default async function handler(req, res) {
     }
     if (!categoria || !CATEGORIAS_PERMITIDAS.includes(categoria)) {
       return res.status(400).json({ error: 'Categoria invalida' });
+    }
+    if (!adminId) {
+      return res.status(400).json({ error: 'Administrador e obrigatorio para criar o grupo' });
     }
 
     const imagemFinal = imageUrl || capa || '';
@@ -202,12 +231,6 @@ export default async function handler(req, res) {
       regras: parseLista(regras),
       faq: parseFaq(faq),
       linkOficial: (linkOficial || '').trim(),
-      adminId,
-      adminIdString,
-      adminEmail,
-      adminNome,
-      adminAvatar,
-      participantesIds: participantesIdsParsed,
       status: status || 'ativo',
       createdAt: new Date(),
       updatedAt: new Date(),

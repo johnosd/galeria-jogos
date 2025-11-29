@@ -17,58 +17,81 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'ID do grupo invalido' });
   }
 
-  const { userId, nome, avatar } = req.body || {};
-  if (!userId && !nome) {
-    return res.status(400).json({ error: 'userId ou nome sao obrigatorios' });
+  const { userId } = req.body || {};
+  if (!userId) {
+    return res.status(400).json({ error: 'userId obrigatorio' });
   }
 
   try {
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB);
-    const grupo = await db.collection('grupos').findOne({ _id: new ObjectId(id) });
+    const grupoId = new ObjectId(id);
+    const grupo = await db.collection('grupos').findOne(
+      { _id: grupoId },
+      { projection: { capacidadeTotal: 1, acesso: 1, status: 1, statusDetalhado: 1, nome: 1 } }
+    );
 
     if (!grupo) {
       return res.status(404).json({ error: 'Grupo nao encontrado' });
     }
 
+    const userIdObj = parseObjectId(userId);
+    if (!userIdObj) {
+      return res.status(400).json({ error: 'userId deve ser um ObjectId valido' });
+    }
+
+    const membrosCollection = db.collection('membrosGrupo');
+    const membrosAtivos = await membrosCollection.countDocuments({ grupoId, status: { $ne: 'banido' } });
     const capacidade = Number(grupo.capacidadeTotal) || 0;
-    const membrosAtivos = Number(grupo.membrosAtivos) || 0;
     if (capacidade && membrosAtivos >= capacidade) {
       return res.status(409).json({ error: 'Grupo sem vagas disponiveis' });
     }
 
-    const userIdObj = parseObjectId(userId);
-    const filter = { _id: new ObjectId(id) };
-    if (userIdObj) {
-      filter.participantesIds = { $ne: userIdObj };
+    const existente = await membrosCollection.findOne({ grupoId, userId: userIdObj, status: { $ne: 'banido' } });
+    if (existente) {
+      return res.status(200).json({ message: 'Usuario ja e membro', membrosAtivos });
     }
 
-    const update = {
-      $set: { updatedAt: new Date() },
+    const agora = new Date();
+    const novoMembro = {
+      grupoId,
+      userId: userIdObj,
+      papel: 'membro',
+      status: 'ativo',
+      temCaucao: false,
+      aguardandoEnvioAcesso: false,
+      dataEntrada: agora,
+      createdAt: agora,
     };
 
-    const addToSet = {};
-    if (userIdObj) addToSet.participantesIds = userIdObj;
-    if (Object.keys(addToSet).length) {
-      update.$addToSet = addToSet;
+    await membrosCollection.insertOne(novoMembro);
+
+    const totalMembros = membrosAtivos + 1;
+    const atingiuCapacidade = capacidade && totalMembros >= capacidade;
+
+    const updateGrupo = { $set: { updatedAt: agora } };
+    if (grupo.acesso === 'apos_completar' && atingiuCapacidade) {
+      updateGrupo.$set.statusDetalhado = 'ativo';
+      updateGrupo.$set.status = 'ativo';
     }
 
-    const push = {
-      participantesHistorico: {
-        userIdString: userId || '',
-        nome: nome || 'Participante',
-        avatar: avatar || '',
-        dataAssinatura: new Date(),
-      },
-    };
-    update.$push = push;
+    await db.collection('grupos').updateOne({ _id: grupoId }, updateGrupo);
 
-    update.$inc = { membrosAtivos: 1 };
-
-    const resultado = await db.collection('grupos').updateOne(filter, update);
-
-    if (resultado.matchedCount === 0) {
-      return res.status(409).json({ error: 'Usuario ja e membro ou grupo indisponivel' });
+    if (grupo.acesso === 'apos_completar' && atingiuCapacidade) {
+      const adminMember = await membrosCollection.findOne({ grupoId, papel: 'admin' });
+      const adminId = adminMember?.userId;
+      if (adminId) {
+        await db.collection('notificacoesUsuario').insertOne({
+          userId: adminId,
+          titulo: 'Grupo formado',
+          mensagem: `O grupo ${grupo.nome || ''} atingiu a capacidade e esta pronto para liberar acesso aos membros.`,
+          tipo: 'grupo',
+          acao: `/admin/grupos/${id}`,
+          lido: false,
+          data: agora,
+          importante: true,
+        });
+      }
     }
 
     return res.status(200).json({ message: 'Participante adicionado', membrosAtivos: membrosAtivos + 1 });

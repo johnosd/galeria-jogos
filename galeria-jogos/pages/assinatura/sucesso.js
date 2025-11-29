@@ -1,27 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { FaCheckCircle } from 'react-icons/fa';
+import { useSession } from 'next-auth/react';
 import Header from '../../components/Header';
 import FlowStepper from '../../components/FlowStepper';
 
+const isValidObjectId = (value) => typeof value === 'string' && /^[a-fA-F0-9]{24}$/.test(value);
+
 export default function Sucesso() {
   const router = useRouter();
-  const { grupoId, nome, preco, userId: queryUserId } = router.query;
+  const { grupoId, nome, preco, userId: queryUserIdRaw } = router.query;
+  const { data: session } = useSession();
   const [registrado, setRegistrado] = useState(false);
   const [userId, setUserId] = useState('');
 
+  const sessionUserId = useMemo(
+    () => session?.user?.id || session?.user?._id || session?.user?.sub || session?.user?.email || '',
+    [session]
+  );
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const existing = queryUserId || localStorage.getItem('client-user-id');
+    const queryUserId = Array.isArray(queryUserIdRaw) ? queryUserIdRaw[0] : queryUserIdRaw;
+    const existing = queryUserId || sessionUserId || localStorage.getItem('client-user-id');
     const id = existing || `client-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
     if (!existing) localStorage.setItem('client-user-id', id);
     setUserId(id);
-  }, [queryUserId]);
+  }, [queryUserIdRaw, sessionUserId]);
 
   useEffect(() => {
     const registrar = async () => {
-      if (!grupoId || !userId) return;
+      if (!grupoId || !userId || !isValidObjectId(userId)) return;
       const flag = `grupo-joined-${grupoId}`;
       if (typeof window !== 'undefined' && localStorage.getItem(flag)) {
         setRegistrado(true);

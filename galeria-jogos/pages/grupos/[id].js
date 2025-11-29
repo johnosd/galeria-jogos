@@ -52,6 +52,8 @@ const DEFAULT_CONTENT = {
   linkOficial: 'https://one.google.com/',
 };
 
+const isValidObjectId = (value) => typeof value === 'string' && /^[a-fA-F0-9]{24}$/.test(value);
+
 const parseNumero = (valor, padrao = NaN) => {
   if (valor === null || valor === undefined) return padrao;
   if (typeof valor === 'object' && ('$numberDouble' in valor || '$numberDecimal' in valor)) {
@@ -65,20 +67,12 @@ const parseNumero = (valor, padrao = NaN) => {
 
 function calcularStatusGrupo(grupo) {
   const capacidadeNum = parseNumero(grupo.capacidadeTotal);
-  const vagasReservadas = parseNumero(grupo.vagasReservadasAdmin);
-  const vagasDisponiveisCampo = parseNumero(grupo.vagasDisponiveis);
-
-  const capacidade = Number.isFinite(capacidadeNum) && capacidadeNum > 0
-    ? capacidadeNum
-    : Number.isFinite(vagasDisponiveisCampo)
-    ? vagasDisponiveisCampo + Math.max(Number.isFinite(vagasReservadas) ? vagasReservadas : 1, 1)
-    : DEFAULT_CONTENT.vagas.total;
-  const vagasDisponiveisCalculada = Math.max(
-    capacidade - (Number.isFinite(vagasReservadas) && vagasReservadas >= 0 ? vagasReservadas : 1),
-    0
-  );
-  const vagasDisponiveis = Number.isFinite(vagasDisponiveisCampo) && vagasDisponiveisCampo >= 0 ? vagasDisponiveisCampo : vagasDisponiveisCalculada;
-  const membrosAtivos = Math.max(capacidade - vagasDisponiveis, 0);
+  const participantes = Array.isArray(grupo.participantes)
+    ? grupo.participantes.filter((p) => p && p.status !== 'banido')
+    : [];
+  const membrosAtivos = participantes.length;
+  const capacidade = Number.isFinite(capacidadeNum) && capacidadeNum > 0 ? capacidadeNum : Math.max(membrosAtivos, DEFAULT_CONTENT.vagas.total);
+  const vagasDisponiveis = Math.max(capacidade - membrosAtivos, 0);
   return { capacidade, membrosAtivos, vagasDisponiveis };
 }
 
@@ -92,8 +86,17 @@ export default function GrupoDetalhe({ grupo }) {
 
   const nome = dados.nome || DEFAULT_CONTENT.nome;
   const valorPorVagaNumero = parseNumero(dados.valorPorVaga);
+  const valorTotalNumero = parseNumero(dados.valorTotal);
+  const capacidadeTotalNumero = parseNumero(dados.capacidadeTotal);
+  const capacidadeDivisor = Number.isFinite(capacidadeTotalNumero) && capacidadeTotalNumero > 0 ? capacidadeTotalNumero : capacidade;
   const precoNumeroFallback = parseNumero(dados.preco);
-  const precoCalculado = Number.isFinite(valorPorVagaNumero) ? valorPorVagaNumero : Number.isFinite(precoNumeroFallback) ? precoNumeroFallback : NaN;
+  const precoCalculado = Number.isFinite(valorPorVagaNumero)
+    ? valorPorVagaNumero
+    : Number.isFinite(valorTotalNumero) && capacidadeDivisor > 0
+    ? valorTotalNumero / capacidadeDivisor
+    : Number.isFinite(precoNumeroFallback)
+    ? precoNumeroFallback
+    : NaN;
   const preco = Number.isFinite(precoCalculado) ? precoCalculado : DEFAULT_CONTENT.preco;
   const descricao = dados.descricao || DEFAULT_CONTENT.descricao;
   const capa = dados.imageUrl || dados.capa || '';
@@ -148,10 +151,41 @@ export default function GrupoDetalhe({ grupo }) {
 
   useEffect(() => {
     if (!userId) return;
-    const found = participantes.some((p) => p?.userId && p.userId === userId);
+    const sessionEmail = session?.user?.email;
+    const foundParticipante = participantes.some(
+      (p) =>
+        (p?.userId && p.userId === userId) ||
+        (sessionEmail && p?.email && p.email === sessionEmail)
+    );
     const flag = grupoId ? localStorage.getItem(`grupo-joined-${grupoId}`) : null;
-    setJaMembro(Boolean(found || flag));
-  }, [userId, participantes, grupoId]);
+    const initial = Boolean(foundParticipante || flag);
+    setJaMembro(initial);
+
+    if (!grupoId || !isValidObjectId(userId)) return;
+
+    let cancelado = false;
+    const verificarMembro = async () => {
+      try {
+        const res = await fetch(`/api/grupos/${grupoId}/join?userId=${userId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelado) return;
+        if (data?.isMembro) {
+          setJaMembro(true);
+        } else if (flag) {
+          localStorage.removeItem(`grupo-joined-${grupoId}`);
+          setJaMembro(false);
+        }
+      } catch (error) {
+        // silencioso
+      }
+    };
+    verificarMembro();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [userId, participantes, grupoId, session]);
 
   const isAdmin = useMemo(() => {
     if (!userId || !participantes.length) return false;
