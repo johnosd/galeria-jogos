@@ -7,7 +7,7 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env.local") });
 
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-const dbName = process.env.MONGODB_DB || "ccplay";
+const dbName = process.env.MONGODB_DB || "usaComigo";
 
 async function loadSchema(schemaName) {
   const filepath = path.join(__dirname, "schemas", schemaName);
@@ -83,6 +83,12 @@ async function run() {
     await createCollection("saques", saquesSchema);
     await db.collection("saques").createIndex({ userId: 1, dataSolicitacao: -1 });
     await db.collection("saques").createIndex({ status: 1 });
+
+    // 7) Codigos de verificacao (TTL)
+    const verificationSchema = await loadSchema("verificationCodes.schema.json");
+    await createCollection("verificationCodes", verificationSchema);
+    await db.collection("verificationCodes").createIndex({ email: 1, tipo: 1, status: 1 });
+    await db.collection("verificationCodes").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
     console.log("\nBanco configurado com sucesso!");
   } catch (error) {

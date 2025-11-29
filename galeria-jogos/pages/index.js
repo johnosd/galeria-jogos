@@ -4,6 +4,17 @@ import { useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
 import Header from '../components/Header';
 
+const parseNumero = (valor, padrao = NaN) => {
+  if (valor === null || valor === undefined) return padrao;
+  if (typeof valor === 'object' && ('$numberDouble' in valor || '$numberDecimal' in valor)) {
+    const raw = valor.$numberDouble || valor.$numberDecimal;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : padrao;
+  }
+  const num = Number(valor);
+  return Number.isFinite(num) ? num : padrao;
+};
+
 export default function Home({ gruposIniciais }) {
   const [busca, setBusca] = useState('');
   const grupos = gruposIniciais;
@@ -36,6 +47,17 @@ export default function Home({ gruposIniciais }) {
             const grupoId = grupo._id || grupo.id;
             const { capacidade, membrosAtivos, vagasDisponiveis, vagasFila } = calcularStatusGrupo(grupo);
             const imageSrc = grupo.imageUrl || grupo.capa;
+            const valorPorVagaNumero = parseNumero(grupo.valorPorVaga);
+            const precoNumero = parseNumero(grupo.preco);
+            const valorTotalNumero = parseNumero(grupo.valorTotal);
+            const mensalidade =
+              Number.isFinite(valorPorVagaNumero) && valorPorVagaNumero > 0
+                ? valorPorVagaNumero
+                : Number.isFinite(precoNumero) && precoNumero > 0
+                ? precoNumero
+                : Number.isFinite(valorTotalNumero) && capacidade > 0
+                ? valorTotalNumero / capacidade
+                : 0;
 
             return (
               <div
@@ -76,7 +98,7 @@ export default function Home({ gruposIniciais }) {
                     </p>
                   )}
                   <p className="font-semibold text-gray-900">
-                    Mensalidade: R$ {Number(grupo.preco).toFixed(2)}
+                    Mensalidade: R$ {mensalidade.toFixed(2)}
                   </p>
                 </div>
 

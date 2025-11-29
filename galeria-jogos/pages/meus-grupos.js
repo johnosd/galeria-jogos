@@ -1,26 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSession } from 'next-auth/react';
 import Header from '../components/Header';
 
 export default function MeusGrupos() {
-  const [userId, setUserId] = useState('');
+  const { data: session, status } = useSession();
   const [grupos, setGrupos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const existing = localStorage.getItem('client-user-id');
-    const id = existing || `client-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
-    if (!existing) localStorage.setItem('client-user-id', id);
-    setUserId(id);
-  }, []);
+  const userId =
+    session?.user?.id || session?.user?._id || session?.user?.sub || session?.user?.userId || session?.user?.uid || '';
 
   useEffect(() => {
+    if (status === 'loading') return;
+    if (!userId) {
+      setCarregando(false);
+      setErro('Faca login para ver seus grupos.');
+      return;
+    }
+
     const fetchGrupos = async () => {
       try {
-        const res = await fetch('/api/grupos');
+        const res = await fetch(`/api/meus-grupos?userId=${encodeURIComponent(userId)}`);
         if (!res.ok) throw new Error('Erro ao carregar grupos');
         const data = await res.json();
         setGrupos(Array.isArray(data) ? data : []);
@@ -31,22 +34,11 @@ export default function MeusGrupos() {
       }
     };
     fetchGrupos();
-  }, []);
+  }, [userId, status]);
 
-  const gruposMembro = useMemo(() => {
-    if (!userId) return [];
-    return grupos.filter((g) => {
-      if (!Array.isArray(g.participantes)) return false;
-      return g.participantes.some((p) => typeof p === 'object' && p?.userId === userId);
-    });
-  }, [grupos, userId]);
-
-  const gruposAdmin = useMemo(() => {
-    if (!userId) return [];
-    return grupos.filter((g) => g?.admin?.userId && g.admin.userId === userId);
-  }, [grupos, userId]);
-
-  const todos = gruposMembro;
+  const gruposMembro = useMemo(() => grupos.filter((g) => g.papel === 'membro'), [grupos]);
+  const gruposAdmin = useMemo(() => grupos.filter((g) => g.papel === 'admin'), [grupos]);
+  const todos = grupos;
 
   return (
     <>
