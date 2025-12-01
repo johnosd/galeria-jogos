@@ -34,8 +34,19 @@ export default function Sucesso() {
       if (!grupoId || !userId || !isValidObjectId(userId)) return;
       const flag = `grupo-joined-${grupoId}`;
       if (typeof window !== 'undefined' && localStorage.getItem(flag)) {
-        setRegistrado(true);
-        return;
+        try {
+          const check = await fetch(`/api/grupos/${grupoId}/join?userId=${userId}`);
+          if (check.ok) {
+            const data = await check.json();
+            if (data?.isMembro) {
+              setRegistrado(true);
+              return;
+            }
+          }
+          localStorage.removeItem(flag);
+        } catch (err) {
+          // segue para tentar registrar novamente
+        }
       }
       try {
         const res = await fetch(`/api/grupos/${grupoId}/join`, {

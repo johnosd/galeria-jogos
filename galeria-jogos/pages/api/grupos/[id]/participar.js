@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       papel: 'membro',
       status: 'ativo',
       temCaucao: false,
-      aguardandoEnvioAcesso: false,
+      aguardandoEnvioAcesso: true,
       dataEntrada: agora,
       createdAt: agora,
     };

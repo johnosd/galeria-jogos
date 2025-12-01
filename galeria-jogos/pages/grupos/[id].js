@@ -357,6 +357,14 @@ export default function GrupoDetalhe({ grupo }) {
                       <FaWhatsapp /> {isAuthenticated ? 'Entrar no grupo' : 'Entrar para participar'}
                     </Link>
                   )}
+                  {jaMembro && !isAdmin && (
+                    <Link
+                      href={`/grupos/${grupoId}/cancelar`}
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-amber-600 text-white hover:bg-amber-700"
+                    >
+                      Cancelar participacao
+                    </Link>
+                  )}
                   {isAdmin && (
                     <>
                       <Link
