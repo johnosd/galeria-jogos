@@ -157,6 +157,22 @@ export default async function handler(req, res) {
 
       await db.collection('grupos').updateOne({ _id: grupoId }, updateGrupo);
 
+      // Notifica admin sobre novo membro
+      const adminMemberNovo = await membrosCollection.findOne({ grupoId, papel: 'admin' });
+      const adminIdNovo = adminMemberNovo?.userId;
+      if (adminIdNovo) {
+        await db.collection('notificacoesUsuario').insertOne({
+          userId: adminIdNovo,
+          titulo: 'Novo membro no grupo',
+          mensagem: `Um novo membro entrou no grupo ${grupo.nome || ''}. Confira os detalhes e envie o acesso.`,
+          tipo: 'grupo',
+          acao: `/admin/grupos/${id}`,
+          lido: false,
+          data: agora,
+          importante: false,
+        });
+      }
+
       if (grupo.acesso === 'apos_completar' && atingiuCapacidade) {
         const adminMember = await membrosCollection.findOne({ grupoId, papel: 'admin' });
         const adminId = adminMember?.userId;
