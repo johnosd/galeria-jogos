@@ -214,6 +214,15 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
                   <p className="text-xs text-gray-300 mt-1">{notif.mensagem}</p>
                 </Link>
               ))}
+              <div className="notification-dropdown__group__see-all border-t border-gray-700 mt-2 pt-2">
+                <Link
+                  href="/notificacoes?tab=todas"
+                  className="block px-4 py-2 text-sm text-blue-200 hover:text-white hover:bg-gray-700 rounded-b-lg"
+                  onClick={() => setNotificacoesAberto(false)}
+                >
+                  Ver todas as notificacoes
+                </Link>
+              </div>
             </div>
           )}
 
