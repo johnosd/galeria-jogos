@@ -113,6 +113,10 @@ O script tambem provisiona `logsAcessoGrupo`, `transacoes`, `saques` e `verifica
 - Monitorar erros e analytics (ex.: Sentry + Vercel Analytics) para acompanhar falhas de API, conversao e engajamento.
 - Melhorar entregabilidade de e-mails: templates HTML, remetente autenticado (SPF/DKIM) e fallback de provedor SMTP.
 
+## Notificacoes (in-app)
+- Validacao de conta: ao cadastrar ou logar com conta nao validada, e criada notificacao “Confirme seu e-mail” (`acao: validar_conta`, tipo `sistema`, importante, nao lida).
+- Grupo formado: quando um grupo com acesso “apos_completar” atinge capacidade ao adicionar membro, o admin recebe “Grupo formado” (`acao: /admin/grupos/{id}`, tipo `grupo`, importante, nao lida).
+- Leitura: `/api/notificacoes?userId={id}&lido=true|false` retorna ate 20 notificacoes ordenadas por data; o Header exibe badge de nao lidas.
 ## Debug
 - Inspecionar Next.js em modo dev: `$env:NODE_OPTIONS="--inspect"; npm run dev` (PowerShell) e conecte o inspector do VS Code/Chrome em `localhost:9229`.
 - API routes (`pages/api/*`): use breakpoints no VS Code com o inspector ativo ou adicione `console.log`.

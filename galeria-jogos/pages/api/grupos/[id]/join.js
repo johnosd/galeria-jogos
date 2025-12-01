@@ -24,6 +24,48 @@ export default async function handler(req, res) {
     const grupoId = new ObjectId(id);
     const membrosCollection = db.collection('membrosGrupo');
 
+    if (req.method === 'DELETE') {
+      const { userId } = req.body || {};
+      const userObjectId = parseObjectId(userId);
+      if (!userObjectId) {
+        return res.status(400).json({ error: 'userId obrigatorio e deve ser um ObjectId valido' });
+      }
+
+      const membro = await membrosCollection.findOne({ grupoId, userId: userObjectId });
+      if (!membro) {
+        return res.status(404).json({ error: 'Membro nao encontrado neste grupo' });
+      }
+      if (membro.papel === 'admin') {
+        return res.status(403).json({ error: 'Administradores nao podem cancelar aqui' });
+      }
+
+      await membrosCollection.deleteOne({ _id: membro._id });
+      const agora = new Date();
+      await db.collection('grupos').updateOne({ _id: grupoId }, { $set: { updatedAt: agora } });
+
+      // Notifica o admin que um membro saiu
+      const adminMember = await membrosCollection.findOne({ grupoId, papel: 'admin' });
+      const adminId = adminMember?.userId || null;
+      if (adminId) {
+        const grupo = await db.collection('grupos').findOne(
+          { _id: grupoId },
+          { projection: { nome: 1 } }
+        );
+        await db.collection('notificacoesUsuario').insertOne({
+          userId: adminId,
+          titulo: 'Membro cancelou participacao',
+          mensagem: `Um membro saiu do grupo ${grupo?.nome || ''}. Revise as vagas e atualizacoes.`,
+          tipo: 'grupo',
+          acao: `/admin/grupos/${id}`,
+          lido: false,
+          data: agora,
+          importante: false,
+        });
+      }
+
+      return res.status(200).json({ message: 'Participacao cancelada' });
+    }
+
     if (req.method === 'GET') {
       const userIdParam = Array.isArray(req.query.userId) ? req.query.userId[0] : req.query.userId;
       const userObjectId = parseObjectId(userIdParam);
@@ -46,7 +88,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method !== 'POST') {
-      res.setHeader('Allow', ['GET', 'POST']);
+      res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
       return res.status(405).json({ error: 'Metodo nao permitido' });
     }
 
@@ -88,7 +130,7 @@ export default async function handler(req, res) {
       papel: 'membro',
       status: 'ativo',
       temCaucao: false,
-      aguardandoEnvioAcesso: false,
+      aguardandoEnvioAcesso: true,
       dataEntrada: agora,
       createdAt: agora,
     };
@@ -114,6 +156,22 @@ export default async function handler(req, res) {
       }
 
       await db.collection('grupos').updateOne({ _id: grupoId }, updateGrupo);
+
+      // Notifica admin sobre novo membro
+      const adminMemberNovo = await membrosCollection.findOne({ grupoId, papel: 'admin' });
+      const adminIdNovo = adminMemberNovo?.userId;
+      if (adminIdNovo) {
+        await db.collection('notificacoesUsuario').insertOne({
+          userId: adminIdNovo,
+          titulo: 'Novo membro no grupo',
+          mensagem: `Um novo membro entrou no grupo ${grupo.nome || ''}. Confira os detalhes e envie o acesso.`,
+          tipo: 'grupo',
+          acao: `/admin/grupos/${id}`,
+          lido: false,
+          data: agora,
+          importante: false,
+        });
+      }
 
       if (grupo.acesso === 'apos_completar' && atingiuCapacidade) {
         const adminMember = await membrosCollection.findOne({ grupoId, papel: 'admin' });

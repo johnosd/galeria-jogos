@@ -6,7 +6,7 @@ import Header from '../../../components/Header';
 
 export default function NovoGrupo() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const fileInputRef = useRef(null);
   const [nome, setNome] = useState('');
   const [capa, setCapa] = useState('');
@@ -24,7 +24,7 @@ export default function NovoGrupo() {
   const [confiabilidade] = useState('Selo ouro');
   const [tipoGrupo, setTipoGrupo] = useState('publico');
   const [categoria, setCategoria] = useState('jogos');
-  const [status, setStatus] = useState('ativo');
+  const [statusGrupo, setStatusGrupo] = useState('ativo');
   const [statusDetalhado, setStatusDetalhado] = useState('em_formacao');
   const [servicoPreAssinado, setServicoPreAssinado] = useState(false);
   const [envioAutomaticoAcesso, setEnvioAutomaticoAcesso] = useState(false);
@@ -63,6 +63,20 @@ export default function NovoGrupo() {
     return Math.max(cap - VAGAS_RESERVADAS_ADMIN, 0);
   }, [capacidadeTotal]);
 
+  useEffect(() => {
+    if (sessionStatus === 'loading') return;
+    if (sessionStatus === 'unauthenticated') {
+      router.replace(`/auth/signin?callbackUrl=${encodeURIComponent('/admin/grupos/novo')}`);
+    }
+  }, [sessionStatus, router]);
+
+  if (sessionStatus === 'loading') {
+    return <div className="pt-[100px] p-6">Carregando sessao...</div>;
+  }
+
+  if (sessionStatus === 'unauthenticated') {
+    return <div className="pt-[100px] p-6">Redirecionando para login...</div>;
+  }
   useEffect(() => {
     if (!valorTotal) {
       setValorPorVaga('');
@@ -144,7 +158,7 @@ export default function NovoGrupo() {
     const payload = {
       nome,
       tipoGrupo,
-      status,
+      status: statusGrupo,
       statusDetalhado,
       capa,
       imageUrl: capa,

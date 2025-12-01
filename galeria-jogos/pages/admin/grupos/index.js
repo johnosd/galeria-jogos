@@ -1,13 +1,21 @@
 import Header from '../../../components/Header';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function GruposAdmin() {
   const { data: session, status } = useSession();
+  const router = useRouter();
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace(`/auth/signin?callbackUrl=${encodeURIComponent('/admin/grupos')}`);
+    }
+  }, [status, router]);
+
   const userId = session?.user?.id || session?.user?._id || session?.user?.sub || session?.user?.userId || '';
   const { data: grupos, error, mutate } = useSWR(
     userId ? `/api/meus-grupos?userId=${encodeURIComponent(userId)}` : null,
@@ -17,6 +25,7 @@ export default function GruposAdmin() {
   const gruposAdmin = useMemo(() => (Array.isArray(grupos) ? grupos.filter((g) => g.papel === 'admin') : []), [grupos]);
 
   if (status === 'loading') return <div className="pt-[100px] p-6">Carregando sessao...</div>;
+  if (status === 'unauthenticated') return <div className="pt-[100px] p-6">Redirecionando para login...</div>;
   if (!userId) return <div className="pt-[100px] p-6">Faca login para ver seus grupos como administrador.</div>;
   if (error) return <div className="pt-[100px] p-6">Falha ao carregar grupos.</div>;
   if (!grupos) return <div className="pt-[100px] p-6">Carregando...</div>;
