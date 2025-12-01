@@ -1,5 +1,7 @@
 import clientPromise from '../../../lib/mongodb';
 import { ObjectId, Int32, Double } from 'mongodb';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]';
 
 const parseNumero = (valor, padrao = 0) => {
   const numero = Number(valor);
@@ -65,6 +67,13 @@ const normalizarPreco = (valor) => {
   return Number.isFinite(num) ? num : NaN;
 };
 
+const parseObjectId = (valor) => {
+  if (!valor) return null;
+  if (valor instanceof ObjectId) return valor;
+  if (typeof valor === 'string' && ObjectId.isValid(valor)) return new ObjectId(valor);
+  return null;
+};
+
 const slugify = (text) =>
   text
     .toString()
@@ -76,6 +85,8 @@ const slugify = (text) =>
 const CATEGORIAS_PERMITIDAS = ['jogos', 'aplicativos', 'assinaturas', 'cursos'];
 
 export default async function handler(req, res) {
+  let adminId = null;
+  let adminUser = null;
   try {
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB);
@@ -164,14 +175,27 @@ export default async function handler(req, res) {
       regras,
       faq,
       linkOficial = '',
-      adminId: adminIdBody = '',
     } = req.body || {};
+
+    const session = await getServerSession(req, res, authOptions);
+    if (!session || !session.user?.id) {
+      return res.status(401).json({ error: 'Nao autenticado' });
+    }
+
+    adminId = parseObjectId(session.user.id || session.user._id || session.user.sub);
+    if (!adminId) {
+      return res.status(403).json({ error: 'Usuario da sessao invalido' });
+    }
+
+    adminUser = await db.collection('users').findOne({ _id: adminId });
+    if (!adminUser) {
+      return res.status(403).json({ error: 'Administrador nao encontrado' });
+    }
 
     const valorTotalNumero = normalizarPreco(valorTotal);
     const valorPorVagaNumero = normalizarPreco(valorPorVaga);
     const capacidadeNumero = Math.trunc(parseNumero(capacidadeTotal));
     const vagasReservadasNumero = Math.trunc(parseNumero(vagasReservadasAdmin));
-    const adminId = typeof adminIdBody === 'string' && ObjectId.isValid(adminIdBody) ? new ObjectId(adminIdBody) : null;
 
     if (!nome) {
       return res.status(400).json({ error: 'Nome e obrigatorio' });
@@ -191,15 +215,15 @@ export default async function handler(req, res) {
     if (!categoria || !CATEGORIAS_PERMITIDAS.includes(categoria)) {
       return res.status(400).json({ error: 'Categoria invalida' });
     }
-    if (!adminId) {
-      return res.status(400).json({ error: 'Administrador e obrigatorio para criar o grupo' });
-    }
 
     const imagemFinal = imageUrl || capa || '';
     const vagasDisponiveisNumero =
       typeof vagasDisponiveis === 'number'
         ? Math.trunc(parseNumero(vagasDisponiveis))
         : Math.max(capacidadeNumero - vagasReservadasNumero, 0);
+
+    const adminNome = adminUser?.nome || adminUser?.name || adminUser?.email || 'Administrador';
+    const adminAvatar = adminUser?.image || adminUser?.avatar || '';
 
     const novoGrupo = {
       nome,
@@ -234,6 +258,17 @@ export default async function handler(req, res) {
       status: status || 'ativo',
       createdAt: new Date(),
       updatedAt: new Date(),
+      adminId,
+      adminIdString: String(adminId),
+      adminNome,
+      adminEmail: adminUser?.email || '',
+      adminAvatar,
+      admin: {
+        userId: adminId,
+        nome: adminNome,
+        email: adminUser?.email || '',
+        avatar: adminAvatar,
+      },
     };
 
     // Evita slug duplicado (retorna 409 ao inves de 500)
@@ -274,9 +309,6 @@ export default async function handler(req, res) {
     console.error('Erro na API /api/grupos:', error?.errInfo || error);
     if (error?.code === 11000) {
       return res.status(409).json({ error: 'Slug ou chave duplicada no cadastro do grupo' });
-    }
-    if (!adminId) {
-      return res.status(400).json({ error: 'Administrador e obrigatorio para criar o grupo' });
     }
     if (error?.code === 121) {
       const detalhes = error?.errInfo || null;

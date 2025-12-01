@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import Header from '../../../components/Header';
 import clientPromise from '../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
@@ -54,6 +55,8 @@ const parseFidelidade = (valor) => {
 
 export default function EditarGrupo({ grupo, participantes = [] }) {
   const router = useRouter();
+  const { status } = useSession();
+  const callbackPath = router?.asPath || (grupo?._id ? `/admin/grupos/${grupo._id}` : '/admin/grupos');
   const fileInputRef = useRef(null);
   const adminNomeExibicao = grupo.adminNome || grupo.admin?.nome || 'Administrador';
   const adminAvatarExibicao = grupo.adminAvatar || grupo.admin?.avatar || '';
@@ -78,7 +81,22 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
   const [confiabilidade] = useState(grupo.confiabilidade || 'Selo ouro');
   const [tipoGrupo, setTipoGrupo] = useState(grupo.tipoGrupo || 'publico');
   const [categoria, setCategoria] = useState(grupo.categoria || 'jogos');
-  const [status, setStatus] = useState(grupo.status || 'ativo');
+  const [statusGrupo, setStatusGrupo] = useState(grupo.status || 'ativo');
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (status === 'unauthenticated') {
+      router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackPath)}`);
+    }
+  }, [status, router, callbackPath]);
+
+  if (status === 'loading') {
+    return <div className="pt-[100px] p-6">Carregando sessao...</div>;
+  }
+
+  if (status === 'unauthenticated') {
+    return <div className="pt-[100px] p-6">Redirecionando para login...</div>;
+  }
   const [servicoPreAssinado, setServicoPreAssinado] = useState(Boolean(grupo.servicoPreAssinado));
   const [envioAutomaticoAcesso, setEnvioAutomaticoAcesso] = useState(Boolean(grupo.envioAutomaticoAcesso));
   const [filaEsperaAtiva, setFilaEsperaAtiva] = useState(Boolean(grupo.filaEsperaAtiva));
@@ -212,7 +230,7 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
       confiabilidade,
       categoria,
       tipoGrupo,
-      status,
+      status: statusGrupo,
       statusDetalhado: statusDetalhadoCalculado,
       servicoPreAssinado,
       envioAutomaticoAcesso,
@@ -231,7 +249,6 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
       adminNome: grupo.adminNome || grupo.admin?.nome || '',
       adminAvatar: grupo.adminAvatar || grupo.admin?.avatar || '',
       participantesIds: grupo.participantesIds || [],
-      status: grupo.status || 'ativo',
     };
 
     try {
@@ -544,8 +561,8 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                   </label>
                   <select
                     id="status"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
+                    value={statusGrupo}
+                    onChange={(e) => setStatusGrupo(e.target.value)}
                     className={`${inputBaseClass} border-gray-200`}
                   >
                     <option value="ativo">Ativo</option>

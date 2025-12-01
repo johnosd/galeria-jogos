@@ -1,10 +1,19 @@
 import clientPromise from '../../../lib/mongodb';
 import { ObjectId, Int32, Double } from 'mongodb';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]';
 
 const parseNumero = (valor, padrao = 0) => {
   const numero = Number(valor);
   if (!Number.isFinite(numero)) return padrao;
   return numero < 0 ? 0 : numero;
+};
+
+const parseObjectId = (valor) => {
+  if (!valor) return null;
+  if (valor instanceof ObjectId) return valor;
+  if (typeof valor === 'string' && ObjectId.isValid(valor)) return new ObjectId(valor);
+  return null;
 };
 
 const parseLista = (valor) => {
@@ -84,9 +93,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'ID invalido' });
   }
 
+  const grupoId = new ObjectId(id);
+
   if (req.method === 'GET') {
     try {
-      const grupo = await db.collection('grupos').findOne({ _id: new ObjectId(id) });
+      const grupo = await db.collection('grupos').findOne({ _id: grupoId });
       if (!grupo) return res.status(404).json({ error: 'Grupo nao encontrado' });
 
       // Traz dados do administrador a partir de membrosGrupo e users (fallback no documento do grupo)
@@ -97,7 +108,7 @@ export default async function handler(req, res) {
       // Busca o membro admin do grupo
       const membroAdmin = await db
         .collection('membrosGrupo')
-        .findOne({ grupoId: new ObjectId(id), papel: 'admin' });
+        .findOne({ grupoId, papel: 'admin' });
 
       if (!adminIdResolved && membroAdmin?.userId) adminIdResolved = membroAdmin.userId;
 
@@ -121,7 +132,7 @@ export default async function handler(req, res) {
       const adminAvatar = adminUser?.image || adminUser?.avatar || grupo.adminAvatar || '';
       const membrosAtivos = await db
         .collection('membrosGrupo')
-        .countDocuments({ grupoId: new ObjectId(id), status: { $ne: 'banido' } });
+        .countDocuments({ grupoId, status: { $ne: 'banido' } });
 
       const resposta = {
         ...grupo,
@@ -145,13 +156,42 @@ export default async function handler(req, res) {
     }
   }
 
+  const session = await getServerSession(req, res, authOptions);
+  if (!session || !session.user?.id) {
+    return res.status(401).json({ error: 'Nao autenticado' });
+  }
+
+  const requesterId = parseObjectId(session.user.id || session.user._id || session.user.sub);
+  if (!requesterId) {
+    return res.status(403).json({ error: 'Usuario da sessao invalido' });
+  }
+
+  const grupo = await db.collection('grupos').findOne({ _id: grupoId });
+  if (!grupo) {
+    return res.status(404).json({ error: 'Grupo nao encontrado' });
+  }
+
+  const adminIdDoc = parseObjectId(grupo.adminId || grupo.adminIdString || grupo.admin?.userId);
+  const membroAdmin = adminIdDoc && adminIdDoc.equals(requesterId)
+    ? { userId: requesterId }
+    : await db.collection('membrosGrupo').findOne({
+        grupoId,
+        userId: requesterId,
+        papel: 'admin',
+        status: { $ne: 'banido' },
+      });
+
+  if (!membroAdmin) {
+    return res.status(403).json({ error: 'Apenas administradores podem alterar o grupo' });
+  }
+
   if (req.method === 'DELETE') {
     try {
-      const resultado = await db.collection('grupos').deleteOne({ _id: new ObjectId(id) });
+      const resultado = await db.collection('grupos').deleteOne({ _id: grupoId });
       if (resultado.deletedCount === 0) return res.status(404).json({ error: 'Grupo nao encontrado' });
 
       // Remove participantes associados ao grupo
-      await db.collection('membrosGrupo').deleteMany({ grupoId: new ObjectId(id) });
+      await db.collection('membrosGrupo').deleteMany({ grupoId });
 
       return res.status(200).json({ message: 'Grupo excluido com sucesso' });
     } catch (error) {
@@ -228,7 +268,7 @@ export default async function handler(req, res) {
 
   try {
     const resultado = await db.collection('grupos').updateOne(
-      { _id: new ObjectId(id) },
+      { _id: grupoId },
       {
         $set: {
           nome,
