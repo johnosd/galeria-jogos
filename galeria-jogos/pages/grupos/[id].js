@@ -126,18 +126,24 @@ export default function GrupoDetalhe({ grupo }) {
     : Array.isArray(dados.admin?.selos) && dados.admin?.selos.length
     ? dados.admin.selos
     : DEFAULT_CONTENT.admin.selos;
-  const participantes =
+  const participantesIniciais =
     Array.isArray(dados.participantes) && dados.participantes.length
       ? dados.participantes.map((item, idx) =>
           typeof item === 'string'
-            ? { nome: item, avatar: `https://i.pravatar.cc/120?img=${(idx % 70) + 1}`, userId: undefined }
+            ? { nome: item, avatar: `https://i.pravatar.cc/120?img=${(idx % 70) + 1}`, userId: undefined, aguardandoEnvioAcesso: false }
             : {
                 nome: item?.nome || `Membro ${idx + 1}`,
                 avatar: item?.avatar || `https://i.pravatar.cc/120?img=${(idx % 70) + 1}`,
                 userId: item?.userId,
+                aguardandoEnvioAcesso: item?.aguardandoEnvioAcesso,
+                dataEnvioAcesso: item?.dataEnvioAcesso,
+                status: item?.status,
+                papel: item?.papel,
+                email: item?.email,
               }
         )
       : DEFAULT_CONTENT.participantes;
+  const [participantes, setParticipantes] = useState(participantesIniciais);
 
   useEffect(() => {
     const sessionId =
@@ -209,6 +215,11 @@ export default function GrupoDetalhe({ grupo }) {
 
     return Boolean(matchesAdminId || matchesAdminEmail || matchesAdminParticipante);
   }, [userId, participantes, session, dados.adminIdString, dados.adminId, dados.admin, dados.adminEmail]);
+
+  const pendentesAcesso = useMemo(
+    () => participantes.filter((p) => p?.aguardandoEnvioAcesso && p?.papel !== 'admin').length,
+    [participantes]
+  );
 
   const handleExcluirGrupo = async () => {
     if (!grupoId || !isAdmin) return;
@@ -367,6 +378,14 @@ export default function GrupoDetalhe({ grupo }) {
                   )}
                   {isAdmin && (
                     <>
+                      {pendentesAcesso > 0 && (
+                        <Link
+                          href={`/grupos/${grupoId}/admin/mensagem?tipo=acesso`}
+                          className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-green-700 text-white hover:bg-green-800"
+                        >
+                          Enviar acessos ({pendentesAcesso})
+                        </Link>
+                      )}
                       <Link
                         href={`/grupos/${grupoId}/admin/mensagem`}
                         className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-indigo-600 text-white hover:bg-indigo-700"
@@ -614,6 +633,8 @@ export async function getServerSideProps({ params }) {
             papel: 1,
             status: 1,
             userId: 1,
+            aguardandoEnvioAcesso: 1,
+            dataEnvioAcesso: 1,
             nome: { $ifNull: ['$user.name', '$user.nome'] },
             email: '$user.email',
             avatar: { $ifNull: ['$user.image', '$user.avatar'] },
@@ -641,6 +662,8 @@ export async function getServerSideProps({ params }) {
         email: m.email || undefined,
         status: m.status,
         papel: m.papel,
+        aguardandoEnvioAcesso: m.aguardandoEnvioAcesso,
+        dataEnvioAcesso: m.dataEnvioAcesso,
       }));
 
     const grupo = {

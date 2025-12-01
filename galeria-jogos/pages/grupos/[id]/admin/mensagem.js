@@ -9,7 +9,12 @@ import { authOptions } from '../../../api/auth/[...nextauth]';
 
 export default function MensagemAdmin({ grupo }) {
   const router = useRouter();
-  const [mensagem, setMensagem] = useState('');
+  const tipo = router.query?.tipo === 'acesso' ? 'acesso' : 'mensagem';
+  const [mensagem, setMensagem] = useState(
+    tipo === 'acesso'
+      ? `Ola! Seu acesso ao grupo ${grupo.nome || ''} foi liberado. Siga as instrucoes enviadas pelo administrador.`
+      : ''
+  );
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
@@ -26,7 +31,9 @@ export default function MensagemAdmin({ grupo }) {
     }
     setEnviando(true);
     try {
-      const res = await fetch(`/api/grupos/${grupo._id}/mensagens`, {
+      const endpoint =
+        tipo === 'acesso' ? `/api/grupos/${grupo._id}/acessos` : `/api/grupos/${grupo._id}/mensagens`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conteudo: mensagem }),
@@ -37,6 +44,7 @@ export default function MensagemAdmin({ grupo }) {
       }
       setSucesso('Mensagem enviada com sucesso aos membros ativos.');
       setMensagem('');
+      setTimeout(() => router.push(`/grupos/${grupo._id}`), 1200);
     } catch (err) {
       setErro(err.message || 'Erro ao enviar mensagem');
     }
@@ -62,7 +70,7 @@ export default function MensagemAdmin({ grupo }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="mensagem" className="text-sm font-semibold text-gray-800">
-                Mensagem aos membros (ate 1000 caracteres)
+                {tipo === 'acesso' ? 'Mensagem de envio de acesso' : 'Mensagem aos membros'} (ate 1000 caracteres)
               </label>
               <textarea
                 id="mensagem"

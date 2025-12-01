@@ -5,6 +5,18 @@
     "_id": { "bsonType": "objectId" },
     "grupoId": { "bsonType": "objectId" },
     "adminId": { "bsonType": "objectId" },
+    "tipo": {
+      "enum": ["mensagem", "acesso"],
+      "description": "Diferencia envios de acesso x mensagens gerais"
+    },
+    "metodoEnvio": {
+      "bsonType": "string",
+      "description": "Canal usado (ex.: email)"
+    },
+    "payload": {
+      "bsonType": ["object", "null"],
+      "description": "Dados complementares do envio"
+    },
     "conteudo": { "bsonType": "string" },
     "destinatarios": {
       "bsonType": "array",
