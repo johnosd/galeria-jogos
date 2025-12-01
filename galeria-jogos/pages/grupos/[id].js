@@ -80,8 +80,12 @@ export default function GrupoDetalhe({ grupo }) {
   const dados = grupo || {};
   const grupoId = dados._id || dados.id || '';
   const { data: session } = useSession();
+  const router = useRouter();
+  const isAuthenticated = Boolean(session?.user);
   const [userId, setUserId] = useState('');
   const [jaMembro, setJaMembro] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExcluir, setErroExcluir] = useState('');
   const { capacidade, membrosAtivos, vagasDisponiveis } = useMemo(() => calcularStatusGrupo(dados), [dados]);
 
   const nome = dados.nome || DEFAULT_CONTENT.nome;
@@ -140,13 +144,9 @@ export default function GrupoDetalhe({ grupo }) {
       session?.user?.id || session?.user?._id || session?.user?.sub || session?.user?.email || null;
     if (sessionId) {
       setUserId(String(sessionId));
-      return;
+    } else {
+      setUserId('');
     }
-    if (typeof window === 'undefined') return;
-    const existing = localStorage.getItem('client-user-id');
-    const id = existing || `client-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
-    if (!existing) localStorage.setItem('client-user-id', id);
-    setUserId(id);
   }, [session]);
 
   useEffect(() => {
@@ -157,8 +157,7 @@ export default function GrupoDetalhe({ grupo }) {
         (p?.userId && p.userId === userId) ||
         (sessionEmail && p?.email && p.email === sessionEmail)
     );
-    const flag = grupoId ? localStorage.getItem(`grupo-joined-${grupoId}`) : null;
-    const initial = Boolean(foundParticipante || flag);
+    const initial = Boolean(foundParticipante);
     setJaMembro(initial);
 
     if (!grupoId || !isValidObjectId(userId)) return;
@@ -172,8 +171,7 @@ export default function GrupoDetalhe({ grupo }) {
         if (cancelado) return;
         if (data?.isMembro) {
           setJaMembro(true);
-        } else if (flag) {
-          localStorage.removeItem(`grupo-joined-${grupoId}`);
+        } else {
           setJaMembro(false);
         }
       } catch (error) {
@@ -188,14 +186,49 @@ export default function GrupoDetalhe({ grupo }) {
   }, [userId, participantes, grupoId, session]);
 
   const isAdmin = useMemo(() => {
-    if (!userId || !participantes.length) return false;
     const sessionEmail = session?.user?.email;
-    return participantes.some(
-      (p) =>
-        p.papel === 'admin' &&
-        ((p.userId && p.userId === userId) || (sessionEmail && p.email && p.email === sessionEmail))
-    );
-  }, [userId, participantes, session]);
+    if (!userId && !sessionEmail) return false;
+    const adminIds = [
+      dados.adminIdString,
+      dados.adminId,
+      dados.admin?.id,
+      dados.admin?.userId,
+    ]
+      .filter(Boolean)
+      .map((id) => String(id));
+
+    const matchesAdminId = userId && adminIds.some((id) => id === userId);
+    const matchesAdminEmail = sessionEmail && (dados.adminEmail === sessionEmail || dados.admin?.email === sessionEmail);
+    const matchesAdminParticipante =
+      participantes?.length > 0 &&
+      participantes.some(
+        (p) =>
+          String(p?.papel || '').toLowerCase() === 'admin' &&
+          ((p.userId && p.userId === userId) || (sessionEmail && p.email && p.email === sessionEmail))
+      );
+
+    return Boolean(matchesAdminId || matchesAdminEmail || matchesAdminParticipante);
+  }, [userId, participantes, session, dados.adminIdString, dados.adminId, dados.admin, dados.adminEmail]);
+
+  const handleExcluirGrupo = async () => {
+    if (!grupoId || !isAdmin) return;
+    const confirmar = window.confirm('Tem certeza que deseja excluir este grupo? Esta acao nao pode ser desfeita.');
+    if (!confirmar) return;
+    setErroExcluir('');
+    setExcluindo(true);
+    try {
+      const res = await fetch(`/api/grupos/${grupoId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Erro ao excluir grupo');
+      }
+      router.push('/grupos').catch(() => router.push('/'));
+    } catch (error) {
+      setErroExcluir(error?.message || 'Erro ao excluir grupo');
+    } finally {
+      setExcluindo(false);
+    }
+  };
 
   const whatsappLink = `https://wa.me/5511997383948?text=${encodeURIComponent(
     `Ola! Quero entrar no grupo de assinatura: ${nome}`
@@ -259,25 +292,9 @@ export default function GrupoDetalhe({ grupo }) {
                   <Badge text="Convite seguro" variant="info" />
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                  {jaMembro || isAdmin ? (
-                    <div className="flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold shadow bg-gray-300 text-gray-600">
-                      <FaWhatsapp /> {jaMembro ? 'Voce ja participa' : 'Administrador do grupo'}
-                    </div>
-                  ) : (
-                    <Link
-                      href={whatsappLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full font-semibold shadow-lg hover:bg-blue-700 transition"
-                    >
-                      <FaWhatsapp /> Entrar no grupo
-                    </Link>
-                  )}
-                  <Link href="/" className="text-blue-700 font-semibold hover:underline">
-                    Ver outros grupos
-                  </Link>
-                </div>
+                <Link href="/" className="text-blue-700 font-semibold hover:underline">
+                  Ver outros grupos
+                </Link>
               </div>
             </div>
 
@@ -315,12 +332,43 @@ export default function GrupoDetalhe({ grupo }) {
                   </div>
                 ) : (
                   <Link
-                    href={`/assinatura/relacionamento${flowQuery}`}
+                    href={
+                      isAuthenticated
+                        ? `/assinatura/relacionamento${flowQuery}`
+                        : `/auth/signin?callbackUrl=${encodeURIComponent(router.asPath || '')}`
+                    }
                     className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-green-600 text-white hover:bg-green-700"
                   >
-                    <FaWhatsapp /> Assinar
+                    <FaWhatsapp /> {isAuthenticated ? 'Assinar' : 'Entrar para assinar'}
                   </Link>
                 )}
+                <div className="flex flex-col gap-2">
+                  {!jaMembro && !isAdmin && (
+                    <Link
+                      href={
+                        isAuthenticated
+                          ? whatsappLink
+                          : `/auth/signin?callbackUrl=${encodeURIComponent(router.asPath || '')}`
+                      }
+                      target={isAuthenticated ? '_blank' : undefined}
+                      rel={isAuthenticated ? 'noopener noreferrer' : undefined}
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300"
+                    >
+                      <FaWhatsapp /> {isAuthenticated ? 'Entrar no grupo' : 'Entrar para participar'}
+                    </Link>
+                  )}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleExcluirGrupo}
+                      disabled={excluindo}
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300"
+                    >
+                      {excluindo ? 'Excluindo...' : 'Excluir grupo'}
+                    </button>
+                  )}
+                  {erroExcluir && <span className="text-sm text-red-600">{erroExcluir}</span>}
+                </div>
               </div>
             </div>
           </div>
