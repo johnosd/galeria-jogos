@@ -1,12 +1,10 @@
 import Image from "next/image";
 import { useSession } from "next-auth/react";
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/router";
+import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 
 export default function Perfil() {
   const { data: session, status, update } = useSession();
-  const router = useRouter();
 
   const [nome, setNome] = useState("");
   const [sobrenome, setSobrenome] = useState("");
@@ -29,6 +27,7 @@ export default function Perfil() {
     numero: "",
     complemento: "",
   });
+  const [cepStatus, setCepStatus] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,6 +37,17 @@ export default function Perfil() {
     () => (nome?.[0] || session?.user?.name?.[0] || session?.user?.email?.[0] || "U").toUpperCase(),
     [nome, session?.user]
   );
+
+  const cepLimpo = useMemo(() => (endereco.cep || "").replace(/\D/g, ""), [endereco.cep]);
+
+  const limparCamposEndereco = () =>
+    setEndereco((prev) => ({
+      ...prev,
+      uf: "",
+      cidade: "",
+      bairro: "",
+      rua: "",
+    }));
 
   useEffect(() => {
     const carregarPerfil = async () => {
@@ -88,6 +98,55 @@ export default function Perfil() {
     };
     carregarPerfil();
   }, [status, session]);
+
+  useEffect(() => {
+    if (!cepLimpo) {
+      setCepStatus("");
+      return;
+    }
+
+    if (cepLimpo.length !== 8) {
+      setCepStatus("CEP deve ter 8 digitos.");
+      limparCamposEndereco();
+      return;
+    }
+
+    const controller = new AbortController();
+    const buscarCep = async () => {
+      setCepStatus("Buscando endereco...");
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`, { signal: controller.signal });
+        if (!res.ok) {
+          throw new Error("Formato de CEP invalido");
+        }
+
+        const data = await res.json();
+        if (data?.erro) {
+          setCepStatus("CEP nao encontrado.");
+          limparCamposEndereco();
+          return;
+        }
+
+        setCepStatus("");
+        setEndereco((prev) => ({
+          ...prev,
+          cep: cepLimpo,
+          uf: data.uf || "",
+          cidade: data.localidade || "",
+          bairro: data.bairro || "",
+          rua: data.logradouro || "",
+        }));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setCepStatus("Erro ao buscar CEP.");
+        limparCamposEndereco();
+      }
+    };
+
+    buscarCep();
+
+    return () => controller.abort();
+  }, [cepLimpo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -222,15 +281,30 @@ export default function Perfil() {
                   type="text"
                   placeholder="CEP"
                   value={endereco.cep}
-                  onChange={(e) => setEndereco({ ...endereco, cep: e.target.value })}
+                  maxLength={8}
+                  pattern="\d{8}"
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  onChange={(e) => {
+                    const rawCep = e.target.value.replace(/\D/g, "");
+                    setEndereco((prev) => ({ ...prev, cep: rawCep }));
+                    if (!rawCep) {
+                      setCepStatus("");
+                    }
+                  }}
                   className="w-full p-2 mb-2 border rounded"
                 />
+                {cepStatus && (
+                  <div className={`text-xs mb-1 ${cepStatus.startsWith("Buscando") ? "text-blue-600" : "text-red-600"}`}>
+                    {cepStatus}
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <input
                     type="text"
                     placeholder="UF"
                     value={endereco.uf}
-                    onChange={(e) => setEndereco({ ...endereco, uf: e.target.value })}
+                    onChange={(e) => setEndereco((prev) => ({ ...prev, uf: e.target.value }))}
                     className="w-20 p-2 mb-2 border rounded"
                     maxLength={2}
                   />
@@ -238,7 +312,7 @@ export default function Perfil() {
                     type="text"
                     placeholder="Cidade"
                     value={endereco.cidade}
-                    onChange={(e) => setEndereco({ ...endereco, cidade: e.target.value })}
+                    onChange={(e) => setEndereco((prev) => ({ ...prev, cidade: e.target.value }))}
                     className="flex-1 p-2 mb-2 border rounded"
                   />
                 </div>
@@ -246,14 +320,14 @@ export default function Perfil() {
                   type="text"
                   placeholder="Bairro"
                   value={endereco.bairro}
-                  onChange={(e) => setEndereco({ ...endereco, bairro: e.target.value })}
+                  onChange={(e) => setEndereco((prev) => ({ ...prev, bairro: e.target.value }))}
                   className="w-full p-2 mb-2 border rounded"
                 />
                 <input
                   type="text"
                   placeholder="Rua"
                   value={endereco.rua}
-                  onChange={(e) => setEndereco({ ...endereco, rua: e.target.value })}
+                  onChange={(e) => setEndereco((prev) => ({ ...prev, rua: e.target.value }))}
                   className="w-full p-2 mb-2 border rounded"
                 />
                 <div className="flex gap-2">
@@ -261,14 +335,14 @@ export default function Perfil() {
                     type="text"
                     placeholder="Numero"
                     value={endereco.numero}
-                    onChange={(e) => setEndereco({ ...endereco, numero: e.target.value })}
+                    onChange={(e) => setEndereco((prev) => ({ ...prev, numero: e.target.value }))}
                     className="w-24 p-2 mb-2 border rounded"
                   />
                   <input
                     type="text"
                     placeholder="Complemento"
                     value={endereco.complemento}
-                    onChange={(e) => setEndereco({ ...endereco, complemento: e.target.value })}
+                    onChange={(e) => setEndereco((prev) => ({ ...prev, complemento: e.target.value }))}
                     className="flex-1 p-2 mb-2 border rounded"
                   />
                 </div>

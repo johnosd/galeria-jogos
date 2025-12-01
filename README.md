@@ -13,6 +13,19 @@ Aplicacao web para compartilhamento de assinaturas via grupos: lista grupos de a
     - Painel: https://dash.cloudflare.com/6fbd40e3eacc44868f91366faa20bc4d
 - React Icons para os botoes e chamadas de acao
 
+## APIs utilizadas
+- Internas (Next.js API Routes)
+  - `/api/grupos` e `/api/grupos/[id]`: CRUD de grupos (MongoDB).
+  - `/api/atualizarPerfil`: leitura/gravacao de dados do usuario (MongoDB).
+  - `/api/cadastro`, `/api/usuario`, `/api/meus-grupos`, `/api/notificacoes`: operacoes relacionadas ao usuario e seus grupos.
+  - `/api/sendVerificationCode`, `/api/verifyCode`, `/api/verifyEmail`, `/api/testSendEmail`: envio e validacao de codigos por e-mail (SMTP via Nodemailer).
+  - `/api/upload/group-image` e `/api/upload/remove-group-image`: manipulacao de imagens de grupo no Cloudflare R2.
+- Externas
+  - NextAuth Google OAuth (login e sessao JWT).
+  - Cloudflare R2 (upload/serving de imagens via S3-compatible API).
+  - ViaCEP (`https://viacep.com.br/ws/{cep}/json/`): auto-preenchimento de endereco no `/perfil`.
+  - SMTP (ex.: Gmail) para envio de codigos de verificacao.
+
 ## Principais fluxos
 - Home (`/`): lista grupos vindos de `/api/grupos`, busca em tempo real e CTA de entrada via WhatsApp com modal de orientacao.
 - Autenticacao: `/auth/signin` faz login com Google; novos usuarios seguem para `/cadastro` e validam e-mail em `/verificacao`.
