@@ -358,14 +358,22 @@ export default function GrupoDetalhe({ grupo }) {
                     </Link>
                   )}
                   {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={handleExcluirGrupo}
-                      disabled={excluindo}
-                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300"
-                    >
-                      {excluindo ? 'Excluindo...' : 'Excluir grupo'}
-                    </button>
+                    <>
+                      <Link
+                        href={`/grupos/${grupoId}/admin/mensagem`}
+                        className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-indigo-600 text-white hover:bg-indigo-700"
+                      >
+                        Enviar mensagem aos membros
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={handleExcluirGrupo}
+                        disabled={excluindo}
+                        className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300"
+                      >
+                        {excluindo ? 'Excluindo...' : 'Excluir grupo'}
+                      </button>
+                    </>
                   )}
                   {erroExcluir && <span className="text-sm text-red-600">{erroExcluir}</span>}
                 </div>

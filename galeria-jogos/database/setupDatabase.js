@@ -90,6 +90,12 @@ async function run() {
     await db.collection("verificationCodes").createIndex({ email: 1, tipo: 1, status: 1 });
     await db.collection("verificationCodes").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+    // 8) Mensagens enviadas aos membros
+    const mensagensSchema = await loadSchema("mensagens.schema.json");
+    await createCollection("mensagens", mensagensSchema);
+    await db.collection("mensagens").createIndex({ grupoId: 1, createdAt: -1 });
+    await db.collection("mensagens").createIndex({ adminId: 1, createdAt: -1 });
+
     console.log("\nBanco configurado com sucesso!");
   } catch (error) {
     console.error("Erro:", error);
