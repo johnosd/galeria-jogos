@@ -1,0 +1,32 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "userId", "gateway", "amount", "status", "createdAt"],
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "UUID v4"
+    },
+    "userId": {
+      "bsonType": "string",
+      "description": "User UUID"
+    },
+    "gateway": {
+      "enum": ["simulated", "mercado_pago"]
+    },
+    "externalId": {
+      "bsonType": ["string", "null"],
+      "description": "Gateway reference/idempotency key"
+    },
+    "amount": {
+      "bsonType": ["double", "int", "long", "decimal"],
+      "minimum": 0.01
+    },
+    "status": {
+      "enum": ["pending", "confirmed", "failed"]
+    },
+    "createdAt": {
+      "bsonType": "date",
+      "description": "ISO date"
+    }
+  }
+}

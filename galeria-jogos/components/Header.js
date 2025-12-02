@@ -163,6 +163,15 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
             </Link>
           )}
 
+          {isAuthenticated && (
+            <Link
+              href="/wallet"
+              className="hidden sm:inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded text-white font-semibold transition"
+            >
+              Minha carteira
+            </Link>
+          )}
+
           <button
             type="button"
             onClick={toggleNotificacoes}
@@ -294,6 +303,13 @@ export default function Header({ admin = false, valorBusca = '', onBuscar = () =
                     onClick={fecharMenu}
                   >
                     Meus grupos
+                  </Link>
+                  <Link
+                    href="/wallet"
+                    className="block px-4 py-2 hover:bg-gray-700"
+                    onClick={fecharMenu}
+                  >
+                    Minha carteira
                   </Link>
                   <Link
                     href="/admin/grupos/novo"
