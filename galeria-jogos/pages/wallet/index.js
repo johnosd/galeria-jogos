@@ -49,6 +49,9 @@ export default function WalletHome() {
               <Link href="/wallet/withdraw" className="px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 text-sm">
                 Sacar
               </Link>
+              <Link href="/wallet/invoices" className="px-3 py-2 rounded bg-gray-800 text-white hover:bg-gray-900 text-sm">
+                Ver faturas
+              </Link>
             </div>
           </div>
 
