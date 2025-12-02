@@ -1,7 +1,8 @@
+import { randomUUID } from 'crypto';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]';
-import { getDb, insertLedgerEntry } from '../../../../lib/mongodb';
-import { calculateBalances, ensureWallet, getSessionUserId } from '../../../../lib/wallet';
+import { getDb } from '../../../../lib/mongodb';
+import { calculateBalances, ensureWallet, getSessionUserId, normalizeAmount } from '../../../../lib/wallet';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -32,35 +33,60 @@ export default async function handler(req, res) {
 
     const wallet = await ensureWallet(userId);
 
-    if (payment.status === 'confirmed') {
-      let ledgerExisting = await db
+    const confirmAndGetLedger = async (creditAmount) => {
+      let ledgerDoc = await db
         .collection('walletTransactions')
         .findOne({ referenceId: paymentId, type: 'credit', source: 'pix' });
-      if (!ledgerExisting) {
-        try {
-          ledgerExisting = await insertLedgerEntry({
-            walletId: wallet._id,
-            type: 'credit',
-            amount: payment.amount,
-            source: 'pix',
-            referenceId: paymentId,
-            status: 'confirmed',
-          });
-        } catch (error) {
-          if (error?.code === 11000) {
-            ledgerExisting = await db
-              .collection('walletTransactions')
-              .findOne({ referenceId: paymentId, type: 'credit', source: 'pix' });
-          } else {
-            throw error;
-          }
+      if (ledgerDoc) return ledgerDoc;
+
+      const toInsert = {
+        _id: randomUUID(),
+        walletId: wallet._id,
+        type: 'credit',
+        amount: creditAmount,
+        source: 'pix',
+        referenceId: paymentId,
+        status: 'confirmed',
+        createdAt: new Date(),
+      };
+
+      try {
+        const result = await db.collection('walletTransactions').insertOne(toInsert);
+        if (!result?.acknowledged) {
+          console.error('PIX confirm: insertOne nao acknowledged', { paymentId, walletId: wallet._id });
+          throw new Error('Insert do ledger nao foi confirmado');
         }
+        // Releitura para garantir que ficou persistido
+        const inserted = await db.collection('walletTransactions').findOne({ _id: toInsert._id });
+        if (inserted) return inserted;
+        console.error('PIX confirm: insert acknowledged mas nao encontrou documento apos insert', {
+          _id: toInsert._id,
+          paymentId,
+        });
+        return toInsert;
+      } catch (error) {
+        if (error?.code === 11000) {
+          const duplicated = await db
+            .collection('walletTransactions')
+            .findOne({ referenceId: paymentId, type: 'credit', source: 'pix' });
+          if (duplicated) return duplicated;
+        }
+        console.error('PIX confirm: erro ao inserir ledger', error);
+        throw error;
       }
+    };
+
+    if (payment.status === 'confirmed') {
+      const creditAmount = normalizeAmount(payment.amount);
+      if (!Number.isFinite(creditAmount) || creditAmount <= 0) {
+        return res.status(400).json({ error: 'Valor do pagamento invalido' });
+      }
+      const ledgerDoc = await confirmAndGetLedger(creditAmount);
       const balances = await calculateBalances(wallet._id);
       return res.status(200).json({
         paymentId,
         status: 'confirmed',
-        ledgerId: ledgerExisting?._id || null,
+        ledgerId: ledgerDoc._id,
         walletId: wallet._id,
         balance: balances.balance,
         available: balances.available,
@@ -76,10 +102,16 @@ export default async function handler(req, res) {
     if (!updatedPayment.value) {
       const latest = await db.collection('payments').findOne({ _id: paymentId, userId });
       if (latest?.status === 'confirmed') {
+        const creditAmountLatest = normalizeAmount(latest.amount);
+        const ledgerDoc = await confirmAndGetLedger(creditAmountLatest);
         const balances = await calculateBalances(wallet._id);
         return res.status(200).json({
           paymentId,
           status: 'confirmed',
+          ledgerId: ledgerDoc?._id,
+          ledgerStatus: ledgerDoc?.status,
+          ledgerAmount: ledgerDoc?.amount,
+          ledgerSource: ledgerDoc?.source,
           walletId: wallet._id,
           balance: balances.balance,
           available: balances.available,
@@ -88,37 +120,31 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Pagamento nao esta pendente' });
     }
 
-    let ledgerEntry = null;
-    try {
-      ledgerEntry = await insertLedgerEntry({
-        walletId: wallet._id,
-        type: 'credit',
-        amount: payment.amount,
-        source: 'pix',
-        referenceId: paymentId,
-        status: 'confirmed',
-      });
-    } catch (error) {
-      if (error?.code === 11000) {
-        ledgerEntry = await db
-          .collection('walletTransactions')
-          .findOne({ referenceId: paymentId, type: 'credit', source: 'pix' });
-      } else {
-        throw error;
-      }
+    const creditAmount = normalizeAmount(updatedPayment.value?.amount ?? payment.amount);
+    if (!Number.isFinite(creditAmount) || creditAmount <= 0) {
+      return res.status(400).json({ error: 'Valor do pagamento invalido' });
+    }
+
+    const ledgerEntry = await confirmAndGetLedger(creditAmount);
+    if (!ledgerEntry?._id) {
+      console.error('PIX confirm: ledger nao retornou id', ledgerEntry);
+      throw new Error('Falha ao criar registro de credito no ledger');
     }
 
     const balances = await calculateBalances(wallet._id);
     return res.status(200).json({
       paymentId,
       status: 'confirmed',
-      ledgerId: ledgerEntry?._id || null,
+      ledgerId: ledgerEntry._id,
+      ledgerStatus: ledgerEntry.status,
+      ledgerAmount: ledgerEntry.amount,
+      ledgerSource: ledgerEntry.source,
       walletId: wallet._id,
       balance: balances.balance,
       available: balances.available,
     });
   } catch (error) {
     console.error('Erro ao confirmar PIX simulado:', error);
-    return res.status(500).json({ error: 'Erro interno no servidor' });
+    return res.status(500).json({ error: error?.message || 'Erro interno no servidor' });
   }
 }

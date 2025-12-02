@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Header from '../../components/Header';
 
 export default function WalletWithdraw() {
   const { status } = useSession();
+  const router = useRouter();
   const [amount, setAmount] = useState('');
   const [cpfPixKey, setCpfPixKey] = useState('');
   const [result, setResult] = useState(null);
@@ -25,6 +27,8 @@ export default function WalletWithdraw() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Erro ao solicitar saque');
       setResult(data);
+      // Após sucesso, envia para resumo da carteira
+      setTimeout(() => router.push('/wallet'), 800);
     } catch (err) {
       setError(err.message || 'Erro ao solicitar saque');
     } finally {

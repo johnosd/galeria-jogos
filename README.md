@@ -91,6 +91,40 @@ O script tambem provisiona `logsAcessoGrupo`, `transacoes`, `saques` e `verifica
   - Variaveis obrigatorias: Mongo (`MONGODB_URI`, `MONGODB_DB`), NextAuth (`GOOGLE_CLIENT_ID/SECRET`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`), SMTP (`EMAIL_USER`, `EMAIL_PASS`), Cloudflare R2 (`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL`), `NEXT_PUBLIC_SITE_URL` (URL publica).
   - Imagens: `next.config.mjs` ja permite `pub-495151c8fd334e6981386bd8a4e6f1c0.r2.dev`; ajuste se mudar o dominio publico da R2.
 
+## Carteira digital (PIX simulado, ledger e saques)
+- Colecoes: `wallets` (UUID, 1:1 user), `payments` (pending/confirmed/failed, gateway `simulated`/`mercado_pago`), `walletTransactions` (ledger: credit/debit, status pending/confirmed/blocked/cancelled, source `pix`/`uso_saldo`/`saque`), `withdrawals` (requested/blocked/approved/paid/rejected).
+- Regras principais:
+  - Nao alterar saldo direto; saldo = soma de creditos confirmados − debitos confirmados; available = saldo − debitos blocked.
+  - PIX simulado cria `payment` pendente; confirmacao gera credito `pix` confirmado no ledger (idempotente por `referenceId` + `type` + `source`).
+  - Uso de saldo (`/wallet/pay`) cria debito confirmado `uso_saldo` se houver saldo.
+  - Saque cria `withdrawal` requested e debito `saque` com status `blocked`; admin aprova (ledger -> confirmed, withdrawal -> paid) ou rejeita (ledger -> cancelled, withdrawal -> rejected).
+  - PIX apenas CPF (11 digitos).
+- Paginas: `/wallet` (saldo), `/wallet/add` (PIX simulado, mostra QR fake), `/wallet/pay`, `/wallet/withdraw`, `/admin/withdrawals` (aprovar/rejeitar; controle por `ADMIN_EMAILS`).
+- Endpoints principais:
+  - `POST /api/pix/simulated/create` (gera payment pendente).
+  - `POST /api/pix/simulated/confirm` (confirma payment e cria credito no ledger de forma idempotente).
+  - `GET /api/wallet/balance` (saldo via ledger), `POST /api/wallet/pay` (debito confirmado).
+  - `POST /api/withdraw/create`, `POST /api/withdraw/approve`, `POST /api/withdraw/reject`, `GET /api/withdraw/list`.
+  - Reset de testes: `POST /api/wallet/reset` (autenticado; so admin pode passar `userId` de terceiros) apaga payments/ledger/withdrawals da carteira do usuario.
+- Variaveis de acesso admin: `ADMIN_EMAILS` (lista separada por virgula); opcionalmente `NEXT_PUBLIC_ADMIN_EMAILS` para o client-side do painel.
+
+### Reset rapido para testes
+Autenticado (token de sessao NextAuth), rodar:
+```bash
+curl -X POST http://localhost:3000/api/wallet/reset \
+  -H "Content-Type: application/json" \
+  -H "Cookie: next-auth.session-token=<TOKEN>" \
+  -d "{}"
+```
+Em bash, se admin e quiser limpar outro usuario:
+```bash
+curl -X POST http://localhost:3000/api/wallet/reset \
+  -H "Content-Type: application/json" \
+  -H "Cookie: next-auth.session-token=<TOKEN_ADMIN>" \
+  -d '{"userId":"<USER_ID_ALVO>"}'
+```
+Isso remove `payments`, `walletTransactions` e `withdrawals` da carteira ligada ao `userId` informado.
+
 ## Testes
 - Disponivel: `npm run lint`.
 - Pendente: suites de testes (unitarios, integracao de API, e2e). Quando adicionar, documente comandos e requisitos (ex.: Playwright/Cypress).
@@ -104,8 +138,7 @@ O script tambem provisiona `logsAcessoGrupo`, `transacoes`, `saques` e `verifica
 - UI: React/Next DevTools no navegador; hot reload do `next dev`.
 
 ## Proximos passos
-- Enriquecer card do grupo com descricao, contagem de membros, contagem de vagas/fila.
-- Permitir entrada direta ou fila de espera com verificacao de vagas e previsao de liberacao.
+
 - Publicar em producao (ex.: Vercel) com secrets configuradas e variaveis de ambiente separadas por stage.
 - Trocar a senha fixa de `/admin` por controle de acesso baseado no usuario autenticado e roles no banco.
 - Adicionar testes automatizados: unitarios (regras de negocio), integracao (API routes) e e2e (Playwright/Cypress) para fluxos de compra, login e admin.

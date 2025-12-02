@@ -1,15 +1,18 @@
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Header from '../../components/Header';
 
 export default function WalletAdd() {
   const { status } = useSession();
+  const router = useRouter();
   const [amount, setAmount] = useState('');
   const [payment, setPayment] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [success, setSuccess] = useState('');
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -36,6 +39,7 @@ export default function WalletAdd() {
     if (!payment?.paymentId) return;
     setConfirming(true);
     setError('');
+    setSuccess('');
     try {
       const res = await fetch('/api/pix/simulated/confirm', {
         method: 'POST',
@@ -44,7 +48,12 @@ export default function WalletAdd() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Erro ao confirmar pagamento');
+      if (!data.ledgerId) {
+        throw new Error('Pagamento confirmado mas credito nao registrado no ledger. Tente novamente.');
+      }
       setPayment((prev) => ({ ...prev, ...data }));
+      setSuccess('Pagamento confirmado e saldo atualizado.');
+      setTimeout(() => router.push('/wallet'), 800);
     } catch (err) {
       setError(err.message || 'Erro ao confirmar pagamento');
     } finally {
@@ -93,6 +102,7 @@ export default function WalletAdd() {
           </form>
 
           {error && <p className="text-red-600 mt-4">{error}</p>}
+          {success && <p className="text-green-600 mt-4">{success}</p>}
 
           {payment && (
             <div className="mt-6 p-4 border rounded-lg bg-gray-50">
@@ -115,6 +125,9 @@ export default function WalletAdd() {
                   Saldo atualizado: R$ {Number(payment.balance || 0).toFixed(2)} (disponível:{' '}
                   {Number(payment.available || 0).toFixed(2)})
                 </p>
+              )}
+              {payment.ledgerId && (
+                <p className="text-xs text-gray-500 mt-1">Ledger ID: {payment.ledgerId}</p>
               )}
             </div>
           )}
