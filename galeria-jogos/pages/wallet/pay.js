@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Header from '../../components/Header';
 
 export default function WalletPay() {
   const { status } = useSession();
+  const router = useRouter();
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [result, setResult] = useState(null);
@@ -25,6 +27,7 @@ export default function WalletPay() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Erro ao usar saldo');
       setResult(data);
+      setTimeout(() => router.push('/wallet'), 800);
     } catch (err) {
       setError(err.message || 'Erro ao usar saldo');
     } finally {
