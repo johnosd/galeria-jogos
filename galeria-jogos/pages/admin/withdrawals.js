@@ -2,14 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Header from '../../components/Header';
 
-const isAllowedAdmin = (session) => {
-  const allowed = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
+const parseFallbackAdmins = () =>
+  (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  if (allowed.length === 0) return true;
-  const email = (session?.user?.email || '').toLowerCase();
-  return allowed.includes(email);
+
+const hasRole = (session, allowedRoles) => {
+  if (!session?.user) return false;
+  if (session.user.isBlocked) return false;
+  const role = session.user.systemRole || 'user';
+  if (allowedRoles.includes(role)) return true;
+  const email = (session.user.email || '').toLowerCase();
+  const adminFallback = parseFallbackAdmins();
+  if (allowedRoles.includes('admin') && adminFallback.includes(email)) return true;
+  return false;
 };
 
 export default function AdminWithdrawals() {
@@ -19,7 +26,9 @@ export default function AdminWithdrawals() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
 
-  const isAdmin = useMemo(() => isAllowedAdmin(session), [session]);
+  const canList = useMemo(() => hasRole(session, ['admin', 'finance', 'support']), [session]);
+  const canAct = useMemo(() => hasRole(session, ['admin', 'finance']), [session]);
+  const isBlocked = Boolean(session?.user?.isBlocked);
 
   const load = async () => {
     setLoading(true);
@@ -37,10 +46,10 @@ export default function AdminWithdrawals() {
   };
 
   useEffect(() => {
-    if (status === 'authenticated' && isAdmin) {
+    if (status === 'authenticated' && canList) {
       load();
     }
-  }, [status, isAdmin]);
+  }, [status, canList]);
 
   const act = async (endpoint, withdrawalId) => {
     setActionLoading(withdrawalId + endpoint);
@@ -52,10 +61,10 @@ export default function AdminWithdrawals() {
         body: JSON.stringify({ withdrawalId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Erro na ação');
+      if (!res.ok) throw new Error(data?.error || 'Erro na acao');
       setItems((prev) => prev.map((w) => (w._id === withdrawalId ? { ...w, status: data.status } : w)));
     } catch (err) {
-      setError(err.message || 'Erro ao executar ação');
+      setError(err.message || 'Erro ao executar acao');
     } finally {
       setActionLoading('');
     }
@@ -70,16 +79,19 @@ export default function AdminWithdrawals() {
       <main className="pt-28 pb-12 px-4">
         <div className="max-w-5xl mx-auto bg-white rounded-xl shadow p-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">Administração de saques</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Administracao de saques</h1>
           </div>
 
-          {status === 'loading' && <p className="text-gray-500">Carregando sessão...</p>}
-          {status === 'unauthenticated' && <p className="text-red-600">Faça login para acessar.</p>}
-          {status === 'authenticated' && !isAdmin && <p className="text-red-600">Acesso restrito a administradores.</p>}
+          {status === 'loading' && <p className="text-gray-500">Carregando sessao...</p>}
+          {status === 'unauthenticated' && <p className="text-red-600">Faca login para acessar.</p>}
+          {status === 'authenticated' && isBlocked && <p className="text-red-600">Conta bloqueada. Procure o suporte.</p>}
+          {status === 'authenticated' && !isBlocked && !canList && (
+            <p className="text-red-600">Acesso restrito ao time (admin/finance/support).</p>
+          )}
 
           {error && <p className="text-red-600 mb-3">{error}</p>}
 
-          {isAdmin && (
+          {canList && !isBlocked && (
             <>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold">Pendentes</h2>
@@ -99,7 +111,7 @@ export default function AdminWithdrawals() {
                   <div key={w._id} className="p-4 border rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm text-gray-700">
-                        Usuário: <span className="font-semibold">{w.userId}</span>
+                        Usuario: <span className="font-semibold">{w.userId}</span>
                       </p>
                       <p className="text-sm text-gray-700">
                         Valor: <span className="font-semibold">R$ {Number(w.amount || 0).toFixed(2)}</span>
@@ -111,14 +123,14 @@ export default function AdminWithdrawals() {
                       <button
                         onClick={() => act('approve', w._id)}
                         className="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                        disabled={actionLoading === w._id + 'approve'}
+                        disabled={actionLoading === w._id + 'approve' || !canAct}
                       >
                         {actionLoading === w._id + 'approve' ? 'Aprovando...' : 'Aprovar'}
                       </button>
                       <button
                         onClick={() => act('reject', w._id)}
                         className="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-                        disabled={actionLoading === w._id + 'reject'}
+                        disabled={actionLoading === w._id + 'reject' || !canAct}
                       >
                         {actionLoading === w._id + 'reject' ? 'Rejeitando...' : 'Rejeitar'}
                       </button>
@@ -133,7 +145,7 @@ export default function AdminWithdrawals() {
                 {finalized.map((w) => (
                   <div key={w._id} className="p-3 border rounded bg-gray-50">
                     <p className="text-sm text-gray-700">
-                      #{w._id} — R$ {Number(w.amount || 0).toFixed(2)} — {w.status}
+                      #{w._id} - R$ {Number(w.amount || 0).toFixed(2)} - {w.status}
                     </p>
                   </div>
                 ))}

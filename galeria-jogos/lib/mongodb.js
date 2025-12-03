@@ -68,6 +68,7 @@ export async function insertPayment({
   amount,
   status = 'pending',
   createdAt = new Date(),
+  pixCpf = null,
 }) {
   if (!userId || !gateway || !amount) {
     throw new Error('userId, gateway e amount sao obrigatorios para criar pagamento');
@@ -80,6 +81,7 @@ export async function insertPayment({
     externalId,
     amount,
     status,
+    ...(pixCpf ? { pixCpf } : {}),
     createdAt,
   };
   await db.collection('payments').insertOne(payment);

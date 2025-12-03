@@ -24,6 +24,10 @@
     "status": {
       "enum": ["pending", "confirmed", "failed"]
     },
+    "pixCpf": {
+      "bsonType": "string",
+      "description": "CPF usado no pagamento Pix"
+    },
     "createdAt": {
       "bsonType": "date",
       "description": "ISO date"

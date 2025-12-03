@@ -2,16 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]';
 import { getDb, getWalletByUser } from '../../../lib/mongodb';
 import { getSessionUserId } from '../../../lib/wallet';
-
-const isAdmin = (session) => {
-  const allowed = (process.env.ADMIN_EMAILS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  if (allowed.length === 0) return false;
-  const email = (session?.user?.email || '').toLowerCase();
-  return allowed.includes(email);
-};
+import { hasRole, isUserBlocked } from '../../../lib/authz';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -27,7 +18,10 @@ export default async function handler(req, res) {
     }
 
     const targetUserId = String(req.body?.userId || sessionUserId);
-    const admin = isAdmin(session);
+    const admin = hasRole(session, ['admin']);
+    if (isUserBlocked(session)) {
+      return res.status(403).json({ error: 'Conta bloqueada. Procure o suporte.' });
+    }
     if (targetUserId !== sessionUserId && !admin) {
       return res.status(403).json({ error: 'Apenas o proprio usuario ou admin podem resetar' });
     }

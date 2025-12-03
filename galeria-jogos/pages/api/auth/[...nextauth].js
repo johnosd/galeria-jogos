@@ -27,6 +27,8 @@ export const authOptions = {
           token.sobrenome = usuario.sobrenome || "";
           token.telefone = usuario.telefone || "";
           token.username = usuario.username || "";
+          token.systemRole = usuario.systemRole || "user";
+          token.isBlocked = usuario.isBlocked || false;
 
           // Cria notificacao de validacao se estiver pendente
           if (!usuario.contaValidada) {
@@ -53,6 +55,8 @@ export const authOptions = {
         } else {
           token.newUser = true;
           token.contaValidada = false;
+          token.systemRole = "user";
+          token.isBlocked = false;
         }
       }
       return token;
@@ -72,6 +76,8 @@ export const authOptions = {
       session.user.username = usuario?.username || "";
       session.user.newUser = token.newUser || false;
       session.user.contaValidada = usuario?.contaValidada || false;
+      session.user.systemRole = usuario?.systemRole || token.systemRole || "user";
+      session.user.isBlocked = usuario?.isBlocked ?? token.isBlocked ?? false;
 
       return session;
     },

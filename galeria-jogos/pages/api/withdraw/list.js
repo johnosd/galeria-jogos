@@ -2,16 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]';
 import { getDb } from '../../../lib/mongodb';
 import { getSessionUserId } from '../../../lib/wallet';
-
-const isAdmin = (session) => {
-  const allowed = (process.env.ADMIN_EMAILS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  if (allowed.length === 0) return true;
-  const email = (session?.user?.email || '').toLowerCase();
-  return allowed.includes(email);
-};
+import { hasRole, isUserBlocked } from '../../../lib/authz';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -25,8 +16,11 @@ export default async function handler(req, res) {
     if (!session || !adminId) {
       return res.status(401).json({ error: 'Nao autenticado' });
     }
-    if (!isAdmin(session)) {
-      return res.status(403).json({ error: 'Apenas administradores podem listar saques' });
+    if (isUserBlocked(session)) {
+      return res.status(403).json({ error: 'Conta bloqueada. Procure o suporte.' });
+    }
+    if (!hasRole(session, ['admin', 'finance', 'support'])) {
+      return res.status(403).json({ error: 'Apenas administradores, financeiro ou suporte podem listar saques' });
     }
 
     const db = await getDb();
