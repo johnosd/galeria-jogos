@@ -1,23 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Header from '../../components/Header';
-
-const parseFallbackAdmins = () =>
-  (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-
-const hasRole = (session, allowedRoles) => {
-  if (!session?.user) return false;
-  if (session.user.isBlocked) return false;
-  const role = session.user.systemRole || 'user';
-  if (allowedRoles.includes(role)) return true;
-  const email = (session.user.email || '').toLowerCase();
-  const adminFallback = parseFallbackAdmins();
-  if (allowedRoles.includes('admin') && adminFallback.includes(email)) return true;
-  return false;
-};
+import { PERMISSIONS, hasRole } from '../../lib/authz';
 
 export default function AdminWithdrawals() {
   const { data: session, status } = useSession();
@@ -26,7 +10,7 @@ export default function AdminWithdrawals() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
 
-  const canList = useMemo(() => hasRole(session, ['admin', 'finance', 'support']), [session]);
+  const canList = useMemo(() => hasRole(session, PERMISSIONS.WITHDRAWALS_TAB), [session]);
   const canAct = useMemo(() => hasRole(session, ['admin', 'finance']), [session]);
   const isBlocked = Boolean(session?.user?.isBlocked);
 
