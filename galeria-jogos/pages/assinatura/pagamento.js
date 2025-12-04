@@ -1,25 +1,54 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import Header from '../../components/Header';
 import FlowStepper from '../../components/FlowStepper';
 
-const METODOS = [
-  { id: 'saldo', titulo: 'Saldo disponivel', valor: 'R$ 1.064,73', badge: 'Sem taxas', taxa: 0 },
-  { id: 'pix', titulo: 'Pix - rapido e sem complicacoes', valor: 'R$ 35,68', badge: '+ R$ 0,68 (taxa)', taxa: 0.68, icon: 'fa-bolt' },
-];
-
 export default function Pagamento() {
   const router = useRouter();
+  const { data: session } = useSession();
   const { grupoId, nome, preco, userId } = router.query;
   const [metodo, setMetodo] = useState('saldo');
-  const [mostrarMetodosExtras, setMostrarMetodosExtras] = useState(false);
   const [mostrarCupom, setMostrarCupom] = useState(false);
+  const [cpfPix, setCpfPix] = useState('');
+  const [cpfTouched, setCpfTouched] = useState(false);
+  const [erroCpf, setErroCpf] = useState('');
+  const [saldo, setSaldo] = useState(null);
+  const [saldoErro, setSaldoErro] = useState('');
+  const [saldoCarregando, setSaldoCarregando] = useState(false);
   const grupoNome = nome || 'Grupo';
   const precoNumero = useMemo(() => {
     const n = Number(preco);
     return Number.isFinite(n) && n > 0 ? n : 35;
   }, [preco]);
+  const saldoFormatado = useMemo(() => {
+    if (saldo === null) return saldoCarregando ? 'Carregando...' : 'Indisponivel';
+    return `R$ ${saldo.toFixed(2)}`;
+  }, [saldo, saldoCarregando]);
+  const saldoSuficiente = saldo !== null ? saldo >= precoNumero : false;
+  const metodos = useMemo(
+    () => [
+      {
+        id: 'saldo',
+        titulo: 'Saldo disponivel',
+        valor: saldoFormatado,
+        badge: saldoCarregando ? 'Carregando...' : saldoSuficiente ? 'Sem taxas' : 'Saldo insuficiente',
+        taxa: 0,
+        disabled: !saldoSuficiente,
+      },
+      {
+        id: 'pix',
+        titulo: 'Pix - rapido e sem complicacoes',
+        valor: `R$ ${(precoNumero + 0.68).toFixed(2)}`,
+        badge: '+ R$ 0,68 (taxa)',
+        taxa: 0.68,
+        icon: 'fa-bolt',
+        disabled: false,
+      },
+    ],
+    [precoNumero, saldoFormatado, saldoCarregando, saldoSuficiente]
+  );
   const hrefSucesso = useMemo(() => {
     const query = new URLSearchParams();
     if (grupoId) query.append('grupoId', grupoId);
@@ -29,6 +58,94 @@ export default function Pagamento() {
     const qs = query.toString();
     return `/assinatura/sucesso${qs ? `?${qs}` : ''}`;
   }, [grupoId, nome, precoNumero, userId]);
+
+  // Limpa validacao se sair do Pix
+  useEffect(() => {
+    if (metodo !== 'pix') {
+      setErroCpf('');
+      setCpfTouched(false);
+    }
+  }, [metodo]);
+
+  useEffect(() => {
+    if (metodo === 'saldo' && !saldoCarregando && !saldoSuficiente) {
+      setMetodo('pix');
+    }
+  }, [metodo, saldoCarregando, saldoSuficiente]);
+
+  // Carrega saldo real da carteira
+  useEffect(() => {
+    const carregarSaldo = async () => {
+      setSaldoCarregando(true);
+      setSaldoErro('');
+      try {
+        const res = await fetch('/api/wallet/balance');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Erro ao carregar saldo');
+        const disponivel = Number(data?.available ?? data?.balance ?? 0);
+        setSaldo(Number.isFinite(disponivel) ? disponivel : 0);
+      } catch (error) {
+        setSaldoErro(error?.message || 'Erro ao carregar saldo');
+      } finally {
+        setSaldoCarregando(false);
+      }
+    };
+    if (session?.user) {
+      carregarSaldo();
+    }
+  }, [session]);
+
+  const validarCpf = (cpf) => {
+    if (!cpf) return false;
+    const num = cpf.replace(/\D/g, '');
+    if (num.length !== 11 || /^(\d)\1{10}$/.test(num)) return false;
+    const calc = (base) => {
+      let sum = 0;
+      for (let i = 0; i < base.length; i += 1) {
+        sum += Number(num[i]) * (base.length + 1 - i);
+      }
+      const mod = (sum * 10) % 11;
+      return mod === 10 ? 0 : mod;
+    };
+    return calc('123456789') === Number(num[9]) && calc('1234567890') === Number(num[10]);
+  };
+
+  const atualizarErroCpf = (valor, touched) => {
+    if (metodo !== 'pix') {
+      setErroCpf('');
+      return;
+    }
+    if (!touched) {
+      setErroCpf('');
+      return;
+    }
+    if (!valor) {
+      setErroCpf('Informe o CPF para pagar via Pix.');
+      return;
+    }
+    if (valor.length !== 11) {
+      setErroCpf('CPF deve ter 11 digitos.');
+      return;
+    }
+    if (!validarCpf(valor)) {
+      setErroCpf('CPF invalido.');
+      return;
+    }
+    setErroCpf('');
+  };
+
+  const cpfValido = metodo === 'pix' ? (cpfPix.length === 11 && validarCpf(cpfPix)) : true;
+  const podeFinalizar = metodo === 'saldo' || cpfValido;
+
+  const handleFinalizar = () => {
+    if (metodo === 'pix' && !cpfValido) {
+      setCpfTouched(true);
+      atualizarErroCpf(cpfPix, true);
+      return;
+    }
+    setErroCpf('');
+    router.push(hrefSucesso);
+  };
 
   return (
     <>
@@ -57,11 +174,15 @@ export default function Pagamento() {
               </section>
 
           <section className="space-y-4">
-            {METODOS.map((item) => (
+            {metodos.map((item) => (
               <label
                 key={item.id}
                 className={`flex items-center gap-4 bg-white border rounded-2xl p-5 shadow-sm cursor-pointer transition ${
-                  metodo === item.id ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100 hover:border-blue-200'
+                  item.disabled
+                    ? 'opacity-60 cursor-not-allowed border-gray-100'
+                    : metodo === item.id
+                    ? 'border-blue-300 ring-2 ring-blue-100'
+                    : 'border-gray-100 hover:border-blue-200'
                 }`}
               >
                 <input
@@ -70,6 +191,7 @@ export default function Pagamento() {
                   value={item.id}
                   checked={metodo === item.id}
                   onChange={() => setMetodo(item.id)}
+                  disabled={item.disabled}
                   className="w-5 h-5 accent-blue-600"
                 />
                 <div className="flex-1">
@@ -87,45 +209,33 @@ export default function Pagamento() {
                 </div>
               </label>
             ))}
-
-            <details
-              className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden"
-              open={mostrarMetodosExtras}
-              onClick={() => setMostrarMetodosExtras((v) => !v)}
-            >
-              <summary className="cursor-pointer px-5 py-4 font-semibold text-gray-900 flex items-center justify-between">
-                Ver mais metodos
-                <span className="text-blue-600 text-lg">+</span>
-              </summary>
-              <div className="divide-y divide-gray-100">
-                {[
-                  { id: 'credito', titulo: 'Cartao de credito', taxa: 'Taxa: R$ 1,20' },
-                  { id: 'boleto', titulo: 'Boleto', taxa: 'Taxa: R$ 1,90' },
-                  { id: 'debito', titulo: 'Debito', taxa: 'Taxa: R$ 0,90' },
-                ].map((extra) => (
-                  <label
-                    key={extra.id}
-                    className={`flex items-center gap-3 px-5 py-4 cursor-pointer transition ${
-                      metodo === extra.id ? 'bg-blue-50' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="metodo"
-                      value={extra.id}
-                      checked={metodo === extra.id}
-                      onChange={() => setMetodo(extra.id)}
-                      className="w-5 h-5 accent-blue-600"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{extra.titulo}</p>
-                      <p className="text-xs text-gray-600">{extra.taxa}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </details>
+            {saldoErro && <p className="text-sm text-red-600">Saldo: {saldoErro}</p>}
           </section>
+
+          {metodo === 'pix' && (
+            <section className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 space-y-2">
+              <p className="text-sm font-semibold text-gray-900">CPF do pagador</p>
+              <p className="text-xs text-gray-600">Use o CPF para gerar a chave Pix corretamente.</p>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={14}
+                placeholder="Digite o CPF (apenas numeros)"
+                value={cpfPix}
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                  setCpfPix(onlyDigits);
+                  if (cpfTouched) atualizarErroCpf(onlyDigits, true);
+                }}
+                onBlur={() => {
+                  setCpfTouched(true);
+                  atualizarErroCpf(cpfPix, true);
+                }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {erroCpf && <p className="text-sm text-red-600">{erroCpf}</p>}
+            </section>
+          )}
 
           <section className="bg-white border border-gray-100 rounded-2xl shadow-sm">
             <button
@@ -158,13 +268,17 @@ export default function Pagamento() {
               <p className="text-lg font-bold text-gray-900">R$ {precoNumero.toFixed(2)}</p>
               <p className="text-xs text-gray-600">Transacao segura criptografada.</p>
             </div>
-            <Link
-              href={hrefSucesso}
-              className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold shadow-lg hover:bg-blue-700 transition"
+            <button
+              type="button"
+              onClick={handleFinalizar}
+              disabled={!podeFinalizar}
+              className={`w-full md:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold shadow-lg transition ${
+                podeFinalizar ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+              }`}
             >
               <i className="fa fa-lock" aria-hidden="true"></i>
               Finalizar pagamento
-            </Link>
+            </button>
           </div>
         </div>
       </main>

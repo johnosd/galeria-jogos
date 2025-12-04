@@ -220,6 +220,10 @@ export default function GrupoDetalhe({ grupo }) {
     () => participantes.filter((p) => p?.aguardandoEnvioAcesso && p?.papel !== 'admin').length,
     [participantes]
   );
+  const hasMembrosSemAdmin = useMemo(
+    () => participantes.some((p) => String(p?.papel || '').toLowerCase() !== 'admin'),
+    [participantes]
+  );
 
   const handleExcluirGrupo = async () => {
     if (!grupoId || !isAdmin) return;
@@ -233,7 +237,7 @@ export default function GrupoDetalhe({ grupo }) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || 'Erro ao excluir grupo');
       }
-      router.push('/grupos').catch(() => router.push('/'));
+      router.push('/admin/grupos').catch(() => router.push('/meus-grupos'));
     } catch (error) {
       setErroExcluir(error?.message || 'Erro ao excluir grupo');
     } finally {
@@ -386,12 +390,22 @@ export default function GrupoDetalhe({ grupo }) {
                           Enviar acessos ({pendentesAcesso})
                         </Link>
                       )}
-                      <Link
-                        href={`/grupos/${grupoId}/admin/mensagem`}
-                        className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-indigo-600 text-white hover:bg-indigo-700"
-                      >
-                        Enviar mensagem aos membros
-                      </Link>
+                      {hasMembrosSemAdmin ? (
+                        <Link
+                          href={`/grupos/${grupoId}/admin/mensagem`}
+                          className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-indigo-600 text-white hover:bg-indigo-700"
+                        >
+                          Enviar mensagem aos membros
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-gray-300 text-gray-600 cursor-not-allowed"
+                        >
+                          Adicione membros para enviar mensagem
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={handleExcluirGrupo}

@@ -31,6 +31,8 @@ export default async function handler(req, res) {
     username,
     cpf,
     endereco = {},
+    systemRole,
+    isBlocked,
   } = req.body;
 
   if (!email || !username || !nome || !sobrenome) {
@@ -38,8 +40,14 @@ export default async function handler(req, res) {
   }
 
   const usernameLimpo = username.trim().replace(/\s/g, "");
+  const systemRolesPermitidos = ["user", "support", "finance", "admin"];
 
   try {
+    const usuarioAtual = await db.collection("users").findOne({ email });
+    if (!usuarioAtual) {
+      return res.status(404).json({ message: "Usuario nao encontrado." });
+    }
+
     const usuarioComMesmoUsername = await db.collection("users").findOne({
       username: usernameLimpo,
       email: { $ne: email },
@@ -59,6 +67,12 @@ export default async function handler(req, res) {
       complemento: endereco.complemento || "",
     };
 
+    const systemRoleSanitizado = systemRolesPermitidos.includes(systemRole)
+      ? systemRole
+      : usuarioAtual.systemRole || "user";
+    const isBlockedNormalizado =
+      typeof isBlocked === "boolean" ? isBlocked : usuarioAtual.isBlocked ?? false;
+
     await db.collection("users").updateOne(
       { email },
       {
@@ -70,6 +84,8 @@ export default async function handler(req, res) {
           username: usernameLimpo,
           cpf: cpf || "",
           endereco: enderecoSanitizado,
+          systemRole: systemRoleSanitizado,
+          isBlocked: isBlockedNormalizado,
         },
       }
     );

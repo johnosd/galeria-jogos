@@ -1,0 +1,38 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "userId", "walletId", "pixKeyCpf", "amount", "status", "createdAt"],
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "UUID v4"
+    },
+    "userId": {
+      "bsonType": "string",
+      "description": "User UUID"
+    },
+    "walletId": {
+      "bsonType": "string",
+      "description": "Wallet UUID"
+    },
+    "pixKeyCpf": {
+      "bsonType": "string",
+      "pattern": "^[0-9]{11}$",
+      "description": "PIX key restricted to CPF digits only"
+    },
+    "amount": {
+      "bsonType": ["double", "int", "long", "decimal"],
+      "minimum": 0.01
+    },
+    "status": {
+      "enum": ["requested", "blocked", "approved", "paid", "rejected"]
+    },
+    "adminId": {
+      "bsonType": ["string", "null"],
+      "description": "Admin UUID that reviewed the withdrawal"
+    },
+    "createdAt": {
+      "bsonType": "date",
+      "description": "ISO date"
+    }
+  }
+}

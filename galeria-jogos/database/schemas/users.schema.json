@@ -15,6 +15,11 @@
     "cpf": { "bsonType": "string" },
 
     "contaValidada": { "bsonType": "bool" },
+    "systemRole": {
+      "bsonType": "string",
+      "enum": ["user", "support", "finance", "admin"]
+    },
+    "isBlocked": { "bsonType": "bool" },
 
     "endereco": {
       "bsonType": "object",

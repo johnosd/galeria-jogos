@@ -96,6 +96,39 @@ async function run() {
     await db.collection("mensagens").createIndex({ grupoId: 1, createdAt: -1 });
     await db.collection("mensagens").createIndex({ adminId: 1, createdAt: -1 });
 
+    // 9) Wallets
+    const walletsSchema = await loadSchema("wallets.schema.json");
+    await createCollection("wallets", walletsSchema);
+    await db.collection("wallets").createIndex({ userId: 1 }, { unique: true });
+    await db.collection("wallets").createIndex({ status: 1 });
+
+    // 10) Payments (PIX / Mercado Pago)
+    const paymentsSchema = await loadSchema("payments.schema.json");
+    await createCollection("payments", paymentsSchema);
+    await db.collection("payments").createIndex({ userId: 1, createdAt: -1 });
+    await db.collection("payments").createIndex({ status: 1 });
+    await db.collection("payments").createIndex(
+      { gateway: 1, externalId: 1 },
+      { unique: true, partialFilterExpression: { externalId: { $type: "string" } } }
+    );
+
+    // 11) WalletTransactions (Ledger)
+    const walletTxSchema = await loadSchema("walletTransactions.schema.json");
+    await createCollection("walletTransactions", walletTxSchema);
+    await db.collection("walletTransactions").createIndex({ walletId: 1, createdAt: -1 });
+    await db.collection("walletTransactions").createIndex({ status: 1 });
+    await db.collection("walletTransactions").createIndex(
+      { referenceId: 1, type: 1, source: 1 },
+      { unique: true, partialFilterExpression: { referenceId: { $type: "string" } } }
+    );
+
+    // 12) Withdrawals
+    const withdrawalsSchema = await loadSchema("withdrawals.schema.json");
+    await createCollection("withdrawals", withdrawalsSchema);
+    await db.collection("withdrawals").createIndex({ userId: 1, createdAt: -1 });
+    await db.collection("withdrawals").createIndex({ walletId: 1 });
+    await db.collection("withdrawals").createIndex({ status: 1 });
+
     console.log("\nBanco configurado com sucesso!");
   } catch (error) {
     console.error("Erro:", error);

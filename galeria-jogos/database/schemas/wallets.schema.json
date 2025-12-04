@@ -1,0 +1,21 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "userId", "status", "createdAt"],
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "UUID v4"
+    },
+    "userId": {
+      "bsonType": "string",
+      "description": "Owner user UUID"
+    },
+    "status": {
+      "enum": ["active", "blocked"]
+    },
+    "createdAt": {
+      "bsonType": "date",
+      "description": "ISO date"
+    }
+  }
+}

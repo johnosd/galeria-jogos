@@ -1,0 +1,35 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "walletId", "type", "amount", "source", "referenceId", "status", "createdAt"],
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "UUID v4"
+    },
+    "walletId": {
+      "bsonType": "string",
+      "description": "Wallet UUID"
+    },
+    "type": {
+      "enum": ["credit", "debit"]
+    },
+    "amount": {
+      "bsonType": ["double", "int", "long", "decimal"],
+      "minimum": 0.01
+    },
+    "source": {
+      "enum": ["pix", "uso_saldo", "saque"]
+    },
+    "referenceId": {
+      "bsonType": ["string", "null"],
+      "description": "Idempotent reference (payment/withdrawal/etc) UUID"
+    },
+    "status": {
+      "enum": ["pending", "confirmed", "blocked", "cancelled"]
+    },
+    "createdAt": {
+      "bsonType": "date",
+      "description": "ISO date"
+    }
+  }
+}
