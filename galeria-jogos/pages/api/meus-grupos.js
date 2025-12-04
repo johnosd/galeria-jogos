@@ -127,6 +127,10 @@ export default async function handler(req, res) {
             membrosAtivos: 1,
             papel: '$papel',
             statusMembro: '$status',
+            invoiceId: '$invoiceId',
+            valorPago: '$valorPago',
+            pagamentoStatus: '$pagamentoStatus',
+            pagamentoData: '$pagamentoData',
           },
         },
       ])

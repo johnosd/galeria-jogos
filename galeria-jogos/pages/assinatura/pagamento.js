@@ -7,7 +7,7 @@ import FlowStepper from '../../components/FlowStepper';
 
 export default function Pagamento() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const { grupoId, nome, preco, userId } = router.query;
   const [metodo, setMetodo] = useState('saldo');
   const [mostrarCupom, setMostrarCupom] = useState(false);
@@ -17,6 +17,10 @@ export default function Pagamento() {
   const [saldo, setSaldo] = useState(null);
   const [saldoErro, setSaldoErro] = useState('');
   const [saldoCarregando, setSaldoCarregando] = useState(false);
+  const [processando, setProcessando] = useState(false);
+  const [erroPagamento, setErroPagamento] = useState('');
+  const [mensagem, setMensagem] = useState('');
+  const [invoiceId, setInvoiceId] = useState('');
   const grupoNome = nome || 'Grupo';
   const precoNumero = useMemo(() => {
     const n = Number(preco);
@@ -49,15 +53,9 @@ export default function Pagamento() {
     ],
     [precoNumero, saldoFormatado, saldoCarregando, saldoSuficiente]
   );
-  const hrefSucesso = useMemo(() => {
-    const query = new URLSearchParams();
-    if (grupoId) query.append('grupoId', grupoId);
-    if (nome) query.append('nome', nome);
-    if (precoNumero) query.append('preco', String(precoNumero));
-    if (userId) query.append('userId', userId);
-    const qs = query.toString();
-    return `/assinatura/sucesso${qs ? `?${qs}` : ''}`;
-  }, [grupoId, nome, precoNumero, userId]);
+
+  const sessionUserId =
+    session?.user?.id || session?.user?._id || session?.user?.sub || session?.user?.userId || session?.user?.uid || '';
 
   // Limpa validacao se sair do Pix
   useEffect(() => {
@@ -137,14 +135,142 @@ export default function Pagamento() {
   const cpfValido = metodo === 'pix' ? (cpfPix.length === 11 && validarCpf(cpfPix)) : true;
   const podeFinalizar = metodo === 'saldo' || cpfValido;
 
-  const handleFinalizar = () => {
+  const pagarFaturaAssinatura = async (invoiceIdAtual) => {
+    const payload = {
+      grupoId,
+      amount: precoNumero,
+      ...(invoiceIdAtual ? { invoiceId: invoiceIdAtual } : {}),
+    };
+    const res = await fetch('/api/assinaturas/pay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data?.error || 'Erro ao processar pagamento');
+    }
+    if (data?.invoiceId) setInvoiceId(data.invoiceId);
+    return data;
+  };
+
+  const confirmarPix = async (valor, cpf) => {
+    const createRes = await fetch('/api/pix/simulated/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: valor, cpf }),
+    });
+    const createData = await createRes.json();
+    if (!createRes.ok) {
+      throw new Error(createData?.error || 'Erro ao gerar pagamento Pix');
+    }
+    const confirmRes = await fetch('/api/pix/simulated/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentId: createData.paymentId }),
+    });
+    const confirmData = await confirmRes.json();
+    if (!confirmRes.ok) {
+      throw new Error(confirmData?.error || 'Erro ao creditar Pix');
+    }
+    return confirmData;
+  };
+
+  const registrarEntradaNoGrupo = async (invoiceIdAtual) => {
+    const res = await fetch(`/api/grupos/${grupoId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceId: invoiceIdAtual }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data?.error || 'Erro ao registrar sua entrada no grupo');
+    }
+    return data;
+  };
+
+  const handleFinalizar = async () => {
+    if (sessionStatus !== 'authenticated' || !sessionUserId) {
+      const callbackUrl = encodeURIComponent(router.asPath || router.pathname || '/');
+      router.push(`/auth/signin?callbackUrl=${callbackUrl}`);
+      return;
+    }
+    if (!grupoId) {
+      setErroPagamento('Grupo nao identificado. Volte e tente novamente.');
+      return;
+    }
     if (metodo === 'pix' && !cpfValido) {
       setCpfTouched(true);
       atualizarErroCpf(cpfPix, true);
       return;
     }
+
+    setErroPagamento('');
     setErroCpf('');
-    router.push(hrefSucesso);
+    setMensagem('');
+    setProcessando(true);
+
+    let pagamento = null;
+    try {
+      pagamento = await pagarFaturaAssinatura(invoiceId || undefined);
+
+      // Se saldo for insuficiente, direciona para Pix
+      if (pagamento.status === 'aguardando_recarga') {
+        setInvoiceId(pagamento.invoiceId);
+        if (metodo !== 'pix') {
+          setErroPagamento('Saldo insuficiente. Selecione Pix para recarregar e concluir o pagamento.');
+          setMetodo('pix');
+          setProcessando(false);
+          return;
+        }
+        const faltante = Number(pagamento.faltante || precoNumero);
+        const valorPix = (Number.isFinite(faltante) ? faltante : precoNumero) + 0.68;
+        setMensagem('Gerando Pix e creditando saldo...');
+        await confirmarPix(valorPix, cpfPix);
+        pagamento = await pagarFaturaAssinatura(pagamento.invoiceId);
+      }
+
+      if (pagamento.status !== 'paga') {
+        throw new Error('Nao foi possivel concluir o pagamento. Tente novamente.');
+      }
+
+      setMensagem('Registrando sua entrada no grupo...');
+      await registrarEntradaNoGrupo(pagamento.invoiceId);
+
+      const query = new URLSearchParams();
+      if (grupoId) query.append('grupoId', grupoId);
+      if (nome) query.append('nome', nome);
+      if (precoNumero) query.append('preco', String(precoNumero));
+      if (pagamento.invoiceId) query.append('invoiceId', pagamento.invoiceId);
+
+      router.push(`/assinatura/sucesso${query.toString() ? `?${query.toString()}` : ''}`);
+    } catch (error) {
+      // Se pagamento concluiu mas join falhou, tenta estornar
+      if (pagamento?.status === 'paga' && pagamento?.invoiceId) {
+        try {
+          const refundRes = await fetch('/api/assinaturas/refund', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoiceId: pagamento.invoiceId }),
+          });
+          if (!refundRes.ok) {
+            const data = await refundRes.json();
+            throw new Error(data?.error || 'Erro ao estornar pagamento');
+          }
+          setErroPagamento('Pagamento estornado porque nao foi possivel registrar sua entrada. Nenhum valor foi cobrado.');
+        } catch (refundErr) {
+          setErroPagamento(refundErr?.message || 'Pagamento feito, mas nao foi possivel registrar entrada ou estornar automaticamente. Abra um chamado.');
+        } finally {
+          setProcessando(false);
+          setMensagem('');
+        }
+        return;
+      }
+      setErroPagamento(error?.message || 'Erro ao processar pagamento');
+    } finally {
+      setProcessando(false);
+      setMensagem('');
+    }
   };
 
   return (
@@ -259,6 +385,9 @@ export default function Pagamento() {
               </div>
             )}
           </section>
+
+          {erroPagamento && <p className="text-sm text-red-600">{erroPagamento}</p>}
+          {mensagem && <p className="text-sm text-blue-700">{mensagem}</p>}
         </div>
 
         <div className="fixed bottom-0 left-0 right-0 md:static md:max-w-4xl md:mx-auto md:mt-8">
@@ -271,13 +400,15 @@ export default function Pagamento() {
             <button
               type="button"
               onClick={handleFinalizar}
-              disabled={!podeFinalizar}
+              disabled={!podeFinalizar || processando}
               className={`w-full md:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold shadow-lg transition ${
-                podeFinalizar ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                podeFinalizar && !processando
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-600 cursor-not-allowed'
               }`}
             >
               <i className="fa fa-lock" aria-hidden="true"></i>
-              Finalizar pagamento
+              {processando ? 'Processando...' : 'Finalizar pagamento'}
             </button>
           </div>
         </div>

@@ -18,7 +18,7 @@
       "minimum": 0.01
     },
     "source": {
-      "enum": ["pix", "uso_saldo", "saque"]
+      "enum": ["pix", "uso_saldo", "saque", "assinatura_grupo", "estorno_assinatura"]
     },
     "referenceId": {
       "bsonType": ["string", "null"],

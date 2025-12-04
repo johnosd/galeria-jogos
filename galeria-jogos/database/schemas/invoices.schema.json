@@ -1,0 +1,61 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "userId", "grupoId", "amount", "status", "createdAt", "updatedAt"],
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "UUID v4"
+    },
+    "userId": {
+      "bsonType": "string",
+      "description": "User UUID (string)"
+    },
+    "grupoId": {
+      "bsonType": "string",
+      "description": "Grupo ObjectId em string (compatível com UUID/hex)"
+    },
+    "amount": {
+      "bsonType": ["double", "int", "long", "decimal"],
+      "minimum": 0.01
+    },
+    "status": {
+      "enum": ["aguardando_pagamento", "aguardando_recarga", "paga", "estornada"]
+    },
+    "description": {
+      "bsonType": ["string", "null"]
+    },
+    "metadata": {
+      "bsonType": ["object", "null"]
+    },
+    "walletId": {
+      "bsonType": ["string", "null"]
+    },
+    "ledgerId": {
+      "bsonType": ["string", "null"]
+    },
+    "paidAt": {
+      "bsonType": ["date", "null"]
+    },
+    "balanceSnapshot": {
+      "bsonType": ["object", "null"]
+    },
+    "faltante": {
+      "bsonType": ["double", "int", "long", "decimal", "null"]
+    },
+    "saldoDisponivel": {
+      "bsonType": ["double", "int", "long", "decimal", "null"]
+    },
+    "vinculadoEm": {
+      "bsonType": ["date", "null"]
+    },
+    "membroId": {
+      "bsonType": ["objectId", "string", "null"]
+    },
+    "createdAt": {
+      "bsonType": "date"
+    },
+    "updatedAt": {
+      "bsonType": "date"
+    }
+  }
+}

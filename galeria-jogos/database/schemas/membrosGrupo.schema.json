@@ -36,6 +36,13 @@
     "dataSaidaEfetiva": { "bsonType": ["date", "null"] },
 
     "dataEntrada": { "bsonType": "date" },
-    "createdAt": { "bsonType": "date" }
+    "createdAt": { "bsonType": "date" },
+
+    "invoiceId": { "bsonType": ["string", "null"] },
+    "valorPago": { "bsonType": ["double", "int", "long", "decimal"] },
+    "pagamentoStatus": {
+      "enum": ["aguardando_pagamento", "aguardando_recarga", "paga", null]
+    },
+    "pagamentoData": { "bsonType": ["date", "null"] }
   }
 }
