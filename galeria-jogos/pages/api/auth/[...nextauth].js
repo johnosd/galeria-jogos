@@ -3,6 +3,13 @@ import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import clientPromise from "../../../lib/mongodb";
 
+const DEFAULT_SESSION_MAX_AGE = 60 * 60 * 24; // 24h
+const DEFAULT_SESSION_UPDATE_AGE = 60 * 30; // 30min
+const envMaxAge = Number.parseInt(process.env.SESSION_MAX_AGE_SECONDS || '', 10);
+const envUpdateAge = Number.parseInt(process.env.SESSION_UPDATE_AGE_SECONDS || '', 10);
+const sessionMaxAge = Number.isFinite(envMaxAge) && envMaxAge > 0 ? envMaxAge : DEFAULT_SESSION_MAX_AGE;
+const sessionUpdateAge = Number.isFinite(envUpdateAge) && envUpdateAge > 0 ? envUpdateAge : DEFAULT_SESSION_UPDATE_AGE;
+
 export const authOptions = {
   providers: [
     GoogleProvider({
@@ -81,6 +88,14 @@ export const authOptions = {
 
       return session;
     },
+  },
+  session: {
+    strategy: "jwt",
+    maxAge: sessionMaxAge,
+    updateAge: sessionUpdateAge,
+  },
+  jwt: {
+    maxAge: sessionMaxAge,
   },
   pages: {
     signIn: "/auth/signin",
