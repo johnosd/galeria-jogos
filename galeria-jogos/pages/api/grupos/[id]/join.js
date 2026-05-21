@@ -1,5 +1,8 @@
 import clientPromise from '../../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]';
+import { INVOICE_STATUS, getInvoiceById } from '../../../../lib/invoices';
 
 const parseObjectId = (valor) => {
   if (typeof valor === 'string' && ObjectId.isValid(valor)) return new ObjectId(valor);
@@ -92,6 +95,26 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: 'Metodo nao permitido' });
     }
 
+    const session = await getServerSession(req, res, authOptions);
+    const sessionUserId = session?.user?.id || session?.user?._id || session?.user?.sub;
+    const userObjectId = parseObjectId(sessionUserId);
+
+    if (!session || !userObjectId) {
+      return res.status(401).json({ error: 'Nao autenticado' });
+    }
+
+    const invoiceIdRaw = String(req.body?.invoiceId || '').trim();
+    if (!invoiceIdRaw) {
+      return res.status(400).json({ error: 'invoiceId obrigatorio para entrar no grupo' });
+    }
+    const invoice = await getInvoiceById(invoiceIdRaw);
+    if (!invoice || invoice.userId !== String(userObjectId) || invoice.grupoId !== String(id)) {
+      return res.status(404).json({ error: 'Fatura nao encontrada para este usuario/grupo' });
+    }
+    if (invoice.status !== INVOICE_STATUS.PAGA) {
+      return res.status(402).json({ error: 'Fatura nao esta paga', status: invoice.status });
+    }
+
     const grupo = await db
       .collection('grupos')
       .findOne(
@@ -103,18 +126,15 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Grupo nao encontrado' });
     }
 
-    const { userId } = req.body || {};
-    const userObjectId = parseObjectId(userId);
-
-    if (!userObjectId) {
-      return res.status(400).json({ error: 'userId obrigatorio e deve ser um ObjectId valido' });
-    }
-
     const membros = await membrosCollection.find({ grupoId, status: { $ne: 'banido' } }).toArray();
 
     const jaMembro = membros.find((m) => m.userId && m.userId.equals(userObjectId));
     if (jaMembro) {
-      return res.status(200).json({ message: 'Usuario ja e membro', membro: jaMembro });
+      await db.collection('invoices').updateOne(
+        { _id: invoice._id },
+        { $set: { vinculadoEm: new Date(), membroId: jaMembro._id } }
+      );
+      return res.status(200).json({ message: 'Usuario ja e membro', membro: jaMembro, invoiceId: invoice._id });
     }
 
     const capacidadeNum = parseNumero(grupo.capacidadeTotal, NaN);
@@ -133,6 +153,10 @@ export default async function handler(req, res) {
       aguardandoEnvioAcesso: true,
       dataEntrada: agora,
       createdAt: agora,
+      invoiceId: invoice._id,
+      valorPago: invoice.amount,
+      pagamentoStatus: invoice.status,
+      pagamentoData: invoice.paidAt || agora,
     };
 
     let vagasDisponiveis = null;
@@ -156,6 +180,10 @@ export default async function handler(req, res) {
       }
 
       await db.collection('grupos').updateOne({ _id: grupoId }, updateGrupo);
+      await db.collection('invoices').updateOne(
+        { _id: invoice._id },
+        { $set: { vinculadoEm: agora, membroId: insertResult.insertedId } }
+      );
 
       // Notifica admin sobre novo membro
       const adminMemberNovo = await membrosCollection.findOne({ grupoId, papel: 'admin' });

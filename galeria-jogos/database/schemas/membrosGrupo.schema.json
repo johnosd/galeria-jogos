@@ -1,40 +1,22 @@
 {
   "bsonType": "object",
-  "required": ["grupoId", "userId", "papel", "status"],
   "properties": {
     "_id": { "bsonType": "objectId" },
-
     "grupoId": { "bsonType": "objectId" },
     "userId": { "bsonType": "objectId" },
-
-    "papel": {
-      "enum": ["admin", "membro"]
-    },
-
-    "status": {
-      "enum": ["ativo", "pendente", "banido", "aguardando_acesso"]
-    },
-
+    "papel": { "bsonType": "string" },
+    "status": { "bsonType": "string" },
     "temCaucao": { "bsonType": "bool" },
-    "caucaoValor": { "bsonType": "double" },
-
+    "aguardandoEnvioAcesso": { "bsonType": "bool" },
     "fidelidade": {
       "bsonType": "object",
       "properties": {
-        "periodoMeses": { "bsonType": "int" },
+        "periodoMeses": { "bsonType": "number" },
         "renovacaoAutomatica": { "bsonType": "bool" },
         "observacoes": { "bsonType": "string" },
-        "proximaRenovacao": { "bsonType": ["date", "null"] }
+        "proximaRenovacao": { "bsonType": "null" }
       }
     },
-
-    "aguardandoEnvioAcesso": { "bsonType": "bool" },
-    "dataEnvioAcesso": { "bsonType": ["date", "null"] },
-    "dataConfirmacaoAcesso": { "bsonType": ["date", "null"] },
-
-    "dataSaidaSolicitada": { "bsonType": ["date", "null"] },
-    "dataSaidaEfetiva": { "bsonType": ["date", "null"] },
-
     "dataEntrada": { "bsonType": "date" },
     "createdAt": { "bsonType": "date" }
   }

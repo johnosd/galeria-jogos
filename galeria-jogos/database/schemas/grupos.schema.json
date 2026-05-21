@@ -1,94 +1,75 @@
 {
   "bsonType": "object",
-  "required": [
-    "tipoGrupo",
-    "nome",
-    "slug",
-    "valorTotal",
-    "valorPorVaga",
-    "status",
-    "capacidadeTotal"
-  ],
   "properties": {
     "_id": { "bsonType": "objectId" },
-
-    "tipoGrupo": {
-      "enum": ["publico", "privado", "pre_cadastrado"]
-    },
-
     "nome": { "bsonType": "string" },
     "slug": { "bsonType": "string" },
-    "subtitulo": { "bsonType": "string" },
-    "descricao": { "bsonType": "string" },
-
     "capa": { "bsonType": "string" },
     "imageUrl": { "bsonType": "string" },
     "imageKey": { "bsonType": "string" },
-
-    "valorTotal": { "bsonType": "double" },
-    "valorPorVaga": { "bsonType": "double" },
-
+    "valorTotal": { "bsonType": "number" },
+    "valorPorVaga": { "bsonType": "number" },
+    "descricao": { "bsonType": "string" },
+    "capacidadeTotal": { "bsonType": "number" },
+    "vagasReservadasAdmin": { "bsonType": "number" },
+    "vagasDisponiveis": { "bsonType": "number" },
     "servicoPreAssinado": { "bsonType": "bool" },
     "envioAutomaticoAcesso": { "bsonType": "bool" },
-
-    "capacidadeTotal": { "bsonType": "int" },
-    "vagasReservadasAdmin": { "bsonType": "int" },
-    "vagasDisponiveis": { "bsonType": "int" },
-
-    "acesso": { "enum": ["imediato", "apos_completar"] },
+    "filaEsperaAtiva": { "bsonType": "bool" },
+    "necessitaAnalise": { "bsonType": "bool" },
+    "observacoesInternas": { "bsonType": "string" },
+    "subtitulo": { "bsonType": "string" },
+    "acesso": { "bsonType": "string" },
     "tempoEntrega": { "bsonType": "string" },
-
+    "confiabilidade": { "bsonType": "string" },
+    "categoria": { "bsonType": "string" },
+    "tipoGrupo": { "bsonType": "string" },
+    "status": { "bsonType": "string" },
+    "statusDetalhado": { "bsonType": "string" },
     "beneficios": {
       "bsonType": "array",
       "items": { "bsonType": "string" }
     },
-
+    "fidelidade": {
+      "bsonType": "object",
+      "properties": {
+        "periodoMeses": { "bsonType": "number" },
+        "renovacaoAutomatica": { "bsonType": "bool" },
+        "observacoes": { "bsonType": "string" },
+        "proximaRenovacao": { "bsonType": "null" }
+      }
+    },
     "regras": {
       "bsonType": "array",
       "items": { "bsonType": "string" }
     },
-
     "faq": {
       "bsonType": "array",
       "items": {
         "bsonType": "object",
-        "required": ["pergunta", "resposta"],
         "properties": {
           "pergunta": { "bsonType": "string" },
           "resposta": { "bsonType": "string" }
         }
       }
     },
-
     "linkOficial": { "bsonType": "string" },
-
-    "status": { "enum": ["ativo", "inativo"] },
-
-    "statusDetalhado": {
-      "enum": [
-        "em_formacao",
-        "aguardando_acesso",
-        "ativo",
-        "bloqueado",
-        "finalizado"
-      ]
-    },
-    "categoria": {
-      "bsonType": "string",
-      "enum": [
-        "jogos",
-        "aplicativos",
-        "assinaturas",
-        "cursos"
-      ]
-    },
-    "filaEsperaAtiva": { "bsonType": "bool" },
-    "dataAtivacao": { "bsonType": ["date", "null"] },
-
-    "necessitaAnalise": { "bsonType": "bool" },
-    "observacoesInternas": { "bsonType": ["string", "null"] },
-
     "createdAt": { "bsonType": "date" },
-    "updatedAt": { "bsonType": "date" }
+    "updatedAt": { "bsonType": "date" },
+    "adminId": { "bsonType": "objectId" },
+    "adminIdString": { "bsonType": "string" },
+    "adminNome": { "bsonType": "string" },
+    "adminEmail": { "bsonType": "string" },
+    "adminAvatar": { "bsonType": "string" },
+    "admin": {
+      "bsonType": "object",
+      "properties": {
+        "userId": { "bsonType": "objectId" },
+        "nome": { "bsonType": "string" },
+        "email": { "bsonType": "string" },
+        "avatar": { "bsonType": "string" }
+      }
+    },
+    "participantesIds": { "bsonType": "array" }
   }
 }

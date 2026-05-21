@@ -83,6 +83,8 @@ function SecaoGrupos({ titulo, descricao, grupos }) {
             const membrosNum = Number(grupo.membrosAtivos ?? 0);
             const capacidade = Number.isFinite(capacidadeNum) && capacidadeNum > 0 ? capacidadeNum : membrosNum;
             const vagas = Math.max(capacidade - membrosNum, 0);
+            const valorPago = Number(grupo.valorPago || 0);
+            const statusPagamento = grupo.pagamentoStatus || 'n/d';
 
             return (
               <Link
@@ -107,6 +109,10 @@ function SecaoGrupos({ titulo, descricao, grupos }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-blue-700 font-semibold truncate">{grupo.nome}</p>
                   <p className="text-xs text-gray-600 truncate">{grupo.descricao || 'Grupo de assinatura'}</p>
+                  <p className="text-[11px] text-gray-600 mt-1">
+                    Pagamento: <span className="font-semibold text-gray-800">{statusPagamento}</span>
+                    {valorPago > 0 && ` • R$ ${valorPago.toFixed(2)}`}
+                  </p>
                   <div className="flex items-center gap-2 text-xs text-gray-700 mt-2">
                     <i className="fa fa-users text-blue-600" aria-hidden="true"></i>
                     <span>

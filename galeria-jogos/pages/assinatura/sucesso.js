@@ -6,65 +6,51 @@ import { useSession } from 'next-auth/react';
 import Header from '../../components/Header';
 import FlowStepper from '../../components/FlowStepper';
 
-const isValidObjectId = (value) => typeof value === 'string' && /^[a-fA-F0-9]{24}$/.test(value);
-
 export default function Sucesso() {
   const router = useRouter();
-  const { grupoId, nome, preco, userId: queryUserIdRaw } = router.query;
   const { data: session } = useSession();
   const [registrado, setRegistrado] = useState(false);
-  const [userId, setUserId] = useState('');
+  const [erro, setErro] = useState('');
+  const [mensagem, setMensagem] = useState('');
+
+  const rawGrupoId = router.query.grupoId;
+  const rawNome = router.query.nome;
+  const rawInvoiceId = router.query.invoiceId;
+  const rawJoinError = router.query.joinError;
+  const grupoId = Array.isArray(rawGrupoId) ? rawGrupoId[0] : rawGrupoId;
+  const nome = Array.isArray(rawNome) ? rawNome[0] : rawNome;
+  const invoiceId = Array.isArray(rawInvoiceId) ? rawInvoiceId[0] : rawInvoiceId;
+  const joinError = Array.isArray(rawJoinError) ? rawJoinError[0] : rawJoinError;
 
   const sessionUserId = useMemo(
-    () => session?.user?.id || session?.user?._id || session?.user?.sub || session?.user?.email || '',
+    () => session?.user?.id || session?.user?._id || session?.user?.sub || '',
     [session]
   );
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const queryUserId = Array.isArray(queryUserIdRaw) ? queryUserIdRaw[0] : queryUserIdRaw;
-    const existing = queryUserId || sessionUserId || localStorage.getItem('client-user-id');
-    const id = existing || `client-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`;
-    if (!existing) localStorage.setItem('client-user-id', id);
-    setUserId(id);
-  }, [queryUserIdRaw, sessionUserId]);
+  const registrar = async () => {
+    if (!grupoId || !invoiceId || !sessionUserId) return;
+    setMensagem('Confirmando pagamento e registrando sua entrada...');
+    setErro('');
+    try {
+      const res = await fetch(`/api/grupos/${grupoId}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Nao foi possivel confirmar sua entrada');
+      }
+      setRegistrado(true);
+      setMensagem('');
+    } catch (error) {
+      setErro(error?.message || 'Erro ao confirmar sua entrada no grupo.');
+    }
+  };
 
   useEffect(() => {
-    const registrar = async () => {
-      if (!grupoId || !userId || !isValidObjectId(userId)) return;
-      const flag = `grupo-joined-${grupoId}`;
-      if (typeof window !== 'undefined' && localStorage.getItem(flag)) {
-        try {
-          const check = await fetch(`/api/grupos/${grupoId}/join?userId=${userId}`);
-          if (check.ok) {
-            const data = await check.json();
-            if (data?.isMembro) {
-              setRegistrado(true);
-              return;
-            }
-          }
-          localStorage.removeItem(flag);
-        } catch (err) {
-          // segue para tentar registrar novamente
-        }
-      }
-      try {
-        const res = await fetch(`/api/grupos/${grupoId}/join`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nomeParticipante: 'Novo membro', userId }),
-        });
-        if (res.ok && typeof window !== 'undefined') {
-          localStorage.setItem(flag, '1');
-          setRegistrado(true);
-        }
-      } catch (error) {
-        // Silencia o erro no front; pagina segue mostrando sucesso visual
-      }
-    };
-
     registrar();
-  }, [grupoId, userId]);
+  }, [grupoId, invoiceId, sessionUserId]);
 
   return (
     <>
@@ -72,6 +58,19 @@ export default function Sucesso() {
       <main className="min-h-screen bg-gray-50 text-gray-900 px-4 pb-12 pt-[110px]">
         <div className="max-w-3xl mx-auto space-y-6">
           <FlowStepper currentStep={3} steps={['Relacionamento', 'Pagamento', 'Sucesso']} />
+
+          {!invoiceId && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              ID da fatura nao informado. Caso nao veja seu acesso, volte e refaca o pagamento.
+            </p>
+          )}
+          {erro && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{erro}</p>}
+          {joinError && !erro && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              Pagamento concluido, mas o acesso nao foi registrado automaticamente: {decodeURIComponent(joinError)}. Clique em “Tentar novamente” abaixo.
+            </p>
+          )}
+          {mensagem && <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">{mensagem}</p>}
 
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 space-y-4 text-center">
             <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg animate-pulse">
@@ -83,7 +82,11 @@ export default function Sucesso() {
             </div>
             <div className="space-y-1">
               <h1 className="text-2xl font-extrabold">Bem-vindo ao grupo!</h1>
-              <p className="text-gray-700">Voce agora faz parte do grupo de {nome || 'assinatura'}.</p>
+              <p className="text-gray-700">
+                {registrado
+                  ? `Voce agora faz parte do grupo de ${nome || 'assinatura'}.`
+                  : 'Estamos finalizando seu acesso. Isso costuma ser rapido.'}
+              </p>
             </div>
             <div className="space-y-2 text-gray-700 text-sm">
               <p>Enviamos uma notificacao ao administrador para liberar tudo certinho.</p>
@@ -111,6 +114,15 @@ export default function Sucesso() {
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
             <div className="flex flex-wrap gap-3">
+              {!registrado && (
+                <button
+                  type="button"
+                  onClick={registrar}
+                  className="min-w-[160px] px-5 py-3 rounded-xl font-semibold text-white bg-amber-600 hover:bg-amber-700 transition shadow"
+                >
+                  Tentar novamente
+                </button>
+              )}
               <Link
                 href="/meus-grupos"
                 className="flex-1 min-w-[160px] text-center px-5 py-3 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 transition shadow"

@@ -112,6 +112,12 @@ async function run() {
       { unique: true, partialFilterExpression: { externalId: { $type: "string" } } }
     );
 
+    // 11) Invoices (faturas de assinatura)
+    const invoicesSchema = await loadSchema("invoices.schema.json");
+    await createCollection("invoices", invoicesSchema);
+    await db.collection("invoices").createIndex({ userId: 1, grupoId: 1, status: 1, createdAt: -1 });
+    await db.collection("invoices").createIndex({ grupoId: 1, createdAt: -1 });
+
     // 11) WalletTransactions (Ledger)
     const walletTxSchema = await loadSchema("walletTransactions.schema.json");
     await createCollection("walletTransactions", walletTxSchema);
