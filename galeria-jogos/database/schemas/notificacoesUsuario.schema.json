@@ -1,65 +1,16 @@
 {
   "bsonType": "object",
-  "required": ["userId", "titulo", "mensagem", "data"],
   "properties": {
     "_id": { "bsonType": "objectId" },
-
-    "userId": {
-      "bsonType": "objectId",
-      "description": "Usuário que receberá a notificação"
-    },
-
-    "titulo": {
-      "bsonType": "string",
-      "description": "Título curto da notificação"
-    },
-
-    "mensagem": {
-      "bsonType": "string",
-      "description": "Texto completo ou resumo da notificação"
-    },
-
-    "tipo": {
-      "enum": [
-        "financeiro",
-        "grupo",
-        "acesso",
-        "sistema",
-        "promocao",
-        "alerta",
-        "informativo"
-      ],
-      "description": "Classificação opcional da notificação"
-    },
-
-    "acao": {
-      "bsonType": ["string", "null"],
-      "description": "Ação executada ao clicar, ex: ver_extrato, abrir_grupo"
-    },
-
-    "lido": {
-      "bsonType": "bool",
-      "description": "Indica se o usuário já visualizou"
-    },
-
-    "data": {
-      "bsonType": "date",
-      "description": "Data de criação da notificação"
-    },
-
-    "importante": {
-      "bsonType": "bool",
-      "description": "Se deve aparecer fixada ou destacada"
-    },
-
-    "dataLido": {
-      "bsonType": ["date", "null"],
-      "description": "Data marcada como lida"
-    },
-
-    "expiraEm": {
-      "bsonType": ["date", "null"],
-      "description": "Data opcional para exclusão automática via TTL"
-    }
+    "userId": { "bsonType": "objectId" },
+    "titulo": { "bsonType": "string" },
+    "mensagem": { "bsonType": "string" },
+    "tipo": { "bsonType": "string" },
+    "acao": { "bsonType": "string" },
+    "lido": { "bsonType": "bool" },
+    "data": { "bsonType": "date" },
+    "importante": { "bsonType": "bool" },
+    "dataLido": { "bsonType": "date" },
+    "expiraEm": { "bsonType": "null" }
   }
 }

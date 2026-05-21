@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(env)",
+      "PowerShell(echo $PROFILE)",
+      "Bash(Test-Path \"C:\\\\Users\\\\johns\\\\.claude\\\\settings.json\")",
+      "Bash(Test-Path \"C:\\\\Users\\\\johns\\\\.claude\\\\settings.local.json\")",
+      "Bash(dir *)",
+      "mcp__mongodb-mcp-server__list-collections",
+      "mcp__mongodb-mcp-server__atlas-list-clusters",
+      "mcp__mongodb-mcp-server__atlas-connect-cluster"
+    ]
+  }
+}

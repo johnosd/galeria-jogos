@@ -1,61 +1,36 @@
 {
   "bsonType": "object",
-  "required": ["_id", "userId", "grupoId", "amount", "status", "createdAt", "updatedAt"],
   "properties": {
-    "_id": {
-      "bsonType": "string",
-      "description": "UUID v4"
-    },
-    "userId": {
-      "bsonType": "string",
-      "description": "User UUID (string)"
-    },
-    "grupoId": {
-      "bsonType": "string",
-      "description": "Grupo ObjectId em string (compatível com UUID/hex)"
-    },
-    "amount": {
-      "bsonType": ["double", "int", "long", "decimal"],
-      "minimum": 0.01
-    },
-    "status": {
-      "enum": ["aguardando_pagamento", "aguardando_recarga", "paga", "estornada"]
-    },
-    "description": {
-      "bsonType": ["string", "null"]
-    },
+    "_id": { "bsonType": "string" },
+    "userId": { "bsonType": "string" },
+    "grupoId": { "bsonType": "string" },
+    "amount": { "bsonType": "number" },
+    "status": { "bsonType": "string" },
+    "description": { "bsonType": "string" },
     "metadata": {
-      "bsonType": ["object", "null"]
+      "bsonType": "object",
+      "properties": {
+        "grupoNome": { "bsonType": "string" },
+        "origem": { "bsonType": "string" }
+      }
     },
-    "walletId": {
-      "bsonType": ["string", "null"]
-    },
-    "ledgerId": {
-      "bsonType": ["string", "null"]
-    },
-    "paidAt": {
-      "bsonType": ["date", "null"]
-    },
+    "createdAt": { "bsonType": "date" },
+    "updatedAt": { "bsonType": "date" },
     "balanceSnapshot": {
-      "bsonType": ["object", "null"]
+      "bsonType": "object",
+      "properties": {
+        "balance": { "bsonType": "number" },
+        "available": { "bsonType": "number" },
+        "confirmedCredits": { "bsonType": "number" },
+        "confirmedDebits": { "bsonType": "number" },
+        "blockedDebits": { "bsonType": "number" },
+        "pendingTotal": { "bsonType": "number" },
+        "returnedTotal": { "bsonType": "number" }
+      }
     },
-    "faltante": {
-      "bsonType": ["double", "int", "long", "decimal", "null"]
-    },
-    "saldoDisponivel": {
-      "bsonType": ["double", "int", "long", "decimal", "null"]
-    },
-    "vinculadoEm": {
-      "bsonType": ["date", "null"]
-    },
-    "membroId": {
-      "bsonType": ["objectId", "string", "null"]
-    },
-    "createdAt": {
-      "bsonType": "date"
-    },
-    "updatedAt": {
-      "bsonType": "date"
-    }
+    "ledgerId": { "bsonType": "string" },
+    "paidAt": { "bsonType": "date" },
+    "walletId": { "bsonType": "string" },
+    "refundedAt": { "bsonType": "date" }
   }
 }

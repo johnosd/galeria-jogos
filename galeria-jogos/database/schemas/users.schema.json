@@ -1,26 +1,16 @@
 {
   "bsonType": "object",
-  "required": ["nome", "sobrenome", "email"],
   "properties": {
     "_id": { "bsonType": "objectId" },
-
     "nome": { "bsonType": "string" },
     "sobrenome": { "bsonType": "string" },
-
     "email": { "bsonType": "string" },
-    "telefone": { "bsonType": "string" },
-
-    "username": { "bsonType": "string" },
     "image": { "bsonType": "string" },
-    "cpf": { "bsonType": "string" },
-
+    "telefone": { "bsonType": "string" },
+    "username": { "bsonType": "string" },
     "contaValidada": { "bsonType": "bool" },
-    "systemRole": {
-      "bsonType": "string",
-      "enum": ["user", "support", "finance", "admin"]
-    },
-    "isBlocked": { "bsonType": "bool" },
-
+    "createdAt": { "bsonType": "date" },
+    "cpf": { "bsonType": "string" },
     "endereco": {
       "bsonType": "object",
       "properties": {
@@ -33,13 +23,7 @@
         "complemento": { "bsonType": "string" }
       }
     },
-
-    "saldoDisponivel": { "bsonType": "double" },
-    "saldoCaucao": { "bsonType": "double" },
-
-    "usa2FA": { "bsonType": "bool" },
-    "pinSeguranca": { "bsonType": ["string", "null"] },
-
-    "createdAt": { "bsonType": "date" }
+    "isBlocked": { "bsonType": "bool" },
+    "systemRole": { "bsonType": "string" }
   }
 }
