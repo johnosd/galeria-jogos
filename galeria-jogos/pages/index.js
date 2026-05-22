@@ -1,8 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
-import { FaWhatsapp } from 'react-icons/fa';
 import Header from '../components/Header';
+import { getDb } from '../lib/mongodb';
 
 const parseNumero = (valor, padrao = NaN) => {
   if (valor === null || valor === undefined) return padrao;
@@ -117,16 +117,6 @@ export default function Home({ gruposIniciais }) {
                     >
                       Ver grupo
                     </Link>
-                    <a
-                      href={`https://wa.me/5511997383948?text=Ola! Quero entrar no grupo de assinatura: ${encodeURIComponent(
-                        grupo.nome
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-4 py-2 rounded-full border border-green-600 text-green-700 hover:bg-green-50 transition text-sm font-semibold"
-                    >
-                      <FaWhatsapp /> WhatsApp
-                    </a>
                   </div>
                 </div>
               </div>
@@ -138,10 +128,37 @@ export default function Home({ gruposIniciais }) {
   );
 }
 
-// Busca os grupos do backend
 export async function getServerSideProps() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/grupos`);
-  const gruposIniciais = await res.json();
+  const db = await getDb();
+  const grupos = await db
+    .collection('grupos')
+    .aggregate([
+      {
+        $lookup: {
+          from: 'membrosGrupo',
+          localField: '_id',
+          foreignField: 'grupoId',
+          as: 'membros',
+        },
+      },
+      {
+        $addFields: {
+          membrosAtivos: {
+            $size: {
+              $filter: {
+                input: '$membros',
+                as: 'm',
+                cond: { $ne: ['$$m.status', 'banido'] },
+              },
+            },
+          },
+        },
+      },
+      { $project: { membros: 0 } },
+    ])
+    .toArray();
+
+  const gruposIniciais = JSON.parse(JSON.stringify(grupos));
 
   return {
     props: {

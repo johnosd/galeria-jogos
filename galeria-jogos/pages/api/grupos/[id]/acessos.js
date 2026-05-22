@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { getServerSession } from 'next-auth';
 import clientPromise from '../../../../lib/mongodb';
 import { authOptions } from '../../auth/[...nextauth]';
+import { isValidEmail } from '../../../../lib/validation';
 
 const parseObjectId = (valor) => {
   if (valor instanceof ObjectId) return valor;
@@ -17,7 +18,6 @@ const buildTransporter = () =>
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
-    tls: { rejectUnauthorized: false },
   });
 
 export default async function handler(req, res) {
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
 
     const destinatarios = pendentes
       .map((p) => p.email)
-      .filter((email) => typeof email === 'string' && /\S+@\S+\.\S+/.test(email));
+      .filter((email) => isValidEmail(email));
 
     if (!destinatarios.length) {
       return res.status(400).json({ error: 'Nenhum membro aguardando possui email valido' });
@@ -118,7 +118,7 @@ export default async function handler(req, res) {
     await Promise.all(
       pendentes.map(async (p) => {
         const email = p.email;
-        if (!email || !/\S+@\S+\.\S+/.test(email)) {
+        if (!email || !isValidEmail(email)) {
           falha.push(email || '');
           return;
         }

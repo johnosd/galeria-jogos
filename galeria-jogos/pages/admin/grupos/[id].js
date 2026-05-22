@@ -55,7 +55,7 @@ const parseFidelidade = (valor) => {
 
 export default function EditarGrupo({ grupo, participantes = [] }) {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const callbackPath = router?.asPath || (grupo?._id ? `/admin/grupos/${grupo._id}` : '/admin/grupos');
   const fileInputRef = useRef(null);
   const adminNomeExibicao = grupo.adminNome || grupo.admin?.nome || 'Administrador';
@@ -97,6 +97,9 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
   if (status === 'unauthenticated') {
     return <div className="pt-[100px] p-6">Redirecionando para login...</div>;
   }
+  const isSystemAdmin = session?.user?.systemRole === 'admin';
+  const canViewInternalNotes = session?.user?.systemRole !== 'user';
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [servicoPreAssinado, setServicoPreAssinado] = useState(Boolean(grupo.servicoPreAssinado));
   const [envioAutomaticoAcesso, setEnvioAutomaticoAcesso] = useState(Boolean(grupo.envioAutomaticoAcesso));
   const [filaEsperaAtiva, setFilaEsperaAtiva] = useState(Boolean(grupo.filaEsperaAtiva));
@@ -206,8 +209,44 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
   const adicionarFaq = () => setFaq([...faq, { pergunta: '', resposta: '' }]);
   const removerFaq = (index) => setFaq(faq.filter((_, i) => i !== index));
 
+  const handleCancelar = async () => {
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/grupos/${grupo._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome, capa, imageUrl: capa, imageKey,
+          valorTotal: parseFloat(valorTotal),
+          valorPorVaga: parseFloat(valorPorVaga),
+          descricao, capacidadeTotal: Number(capacidadeTotal) || 0,
+          vagasReservadasAdmin: Number(vagasReservadasAdmin) || 0,
+          vagasDisponiveis, subtitulo, acesso, tempoEntrega, confiabilidade,
+          categoria, tipoGrupo,
+          status: 'cancelado',
+          statusDetalhado: statusDetalhadoCalculado,
+          servicoPreAssinado, envioAutomaticoAcesso, filaEsperaAtiva, necessitaAnalise,
+          observacoesInternas,
+          beneficios: beneficios.map((b) => b.trim()).filter(Boolean),
+          fidelidadePeriodo, fidelidadeRenovacao, fidelidadeObservacoes,
+          regras: regras.map((r) => r.trim()).filter(Boolean),
+          faq: faq.map((f) => ({ pergunta: f.pergunta.trim(), resposta: f.resposta.trim() })),
+          linkOficial: linkOficial?.trim() || '',
+        }),
+      });
+      if (!res.ok) throw new Error('Erro ao cancelar grupo.');
+      setSucesso('Grupo cancelado.');
+      setTimeout(() => router.push('/admin/grupos'), 1500);
+    } catch (error) {
+      setMsg(error.message || 'Erro ao cancelar grupo.');
+    }
+    setSalvando(false);
+    setConfirmCancel(false);
+  };
+
   const handleSalvar = async (e) => {
     e.preventDefault();
+    if (!isSystemAdmin) return;
     setMsg('');
     setSucesso('');
     if (!validateForm()) return;
@@ -258,12 +297,26 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Erro ao salvar grupo.');
+
+      if (imagemFile) {
+        setUploadingImg(true);
+        const formData = new FormData();
+        formData.append('groupId', grupo._id);
+        formData.append('file', imagemFile);
+        const uploadRes = await fetch('/api/upload/group-image', { method: 'POST', body: formData });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploadData?.error || 'Erro ao enviar imagem');
+        setCapa(uploadData.url);
+        if (uploadData.key) setImageKey(uploadData.key);
+      }
+
       setSucesso('Grupo atualizado com sucesso!');
       setTimeout(() => router.push('/admin/grupos'), 1200);
     } catch (error) {
       setMsg(error.message || 'Erro ao salvar grupo.');
     }
     setSalvando(false);
+    setUploadingImg(false);
   };
 
   return (
@@ -294,8 +347,9 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white"
+                    onClick={() => isSystemAdmin && fileInputRef.current?.click()}
+                    disabled={!isSystemAdmin}
+                    className={`px-4 py-2 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white ${isSystemAdmin ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                     aria-label="Selecionar imagem do grupo"
                   >
                     {uploadingImg ? 'Enviando...' : 'Carregar imagem'}
@@ -403,12 +457,13 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setCategoria(item.id)}
+                      onClick={() => isSystemAdmin && setCategoria(item.id)}
+                      disabled={!isSystemAdmin}
                       className={`flex flex-col items-center justify-center gap-2 border rounded-lg p-3 text-sm font-semibold transition ${
                         selecionado
                           ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
                           : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
-                      }`}
+                      } ${!isSystemAdmin ? 'opacity-60 cursor-not-allowed' : ''}`}
                       aria-pressed={selecionado}
                     >
                       <span className="text-2xl" aria-hidden="true">
@@ -495,8 +550,10 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                     max={Math.max((Number(capacidadeTotal) || 0) - 1, 1)}
                     aria-invalid={!!errors.vagasReservadasAdmin}
                     value={vagasReservadasAdmin}
-                    onChange={(e) => setVagasReservadasAdmin(e.target.value)}
-                    className={`${inputBaseClass} ${errors.vagasReservadasAdmin ? 'border-red-500' : 'border-gray-200'}`}
+                    onChange={(e) => isSystemAdmin && setVagasReservadasAdmin(e.target.value)}
+                    readOnly={!isSystemAdmin}
+                    disabled={!isSystemAdmin}
+                    className={`${inputBaseClass} ${errors.vagasReservadasAdmin ? 'border-red-500' : 'border-gray-200'} ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                   />
                   <p className={helperClass}>Admin pode reservar mais vagas desde que reste ao menos 1 vaga para membros.</p>
                   {errors.vagasReservadasAdmin && <p className={errorClass}>{errors.vagasReservadasAdmin}</p>}
@@ -527,12 +584,13 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => setAcesso(item.id)}
+                          onClick={() => isSystemAdmin && setAcesso(item.id)}
+                          disabled={!isSystemAdmin}
                           className={`flex flex-col items-center justify-center gap-2 border rounded-lg p-3 text-sm font-semibold transition ${
                             selecionado
                               ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
                               : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
-                          }`}
+                          } ${!isSystemAdmin ? 'opacity-60 cursor-not-allowed' : ''}`}
                           aria-pressed={selecionado}
                         >
                           <span className="text-2xl" aria-hidden="true">
@@ -551,8 +609,10 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                   <input
                     id="tempoEntrega"
                     value={tempoEntrega}
-                    onChange={(e) => setTempoEntrega(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    onChange={(e) => isSystemAdmin && setTempoEntrega(e.target.value)}
+                    readOnly={!isSystemAdmin}
+                    disabled={!isSystemAdmin}
+                    className={`${inputBaseClass} border-gray-200 ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                   />
                 </div>
                 <div className="space-y-1">
@@ -562,11 +622,13 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                   <select
                     id="status"
                     value={statusGrupo}
-                    onChange={(e) => setStatusGrupo(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    onChange={(e) => isSystemAdmin && setStatusGrupo(e.target.value)}
+                    disabled={!isSystemAdmin}
+                    className={`${inputBaseClass} border-gray-200 ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                   >
                     <option value="ativo">Ativo</option>
                     <option value="inativo">Inativo</option>
+                    <option value="cancelado">Cancelado</option>
                   </select>
                 </div>
               </div>
@@ -578,8 +640,9 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                   <select
                     id="tipoGrupo"
                     value={tipoGrupo}
-                    onChange={(e) => setTipoGrupo(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    onChange={(e) => isSystemAdmin && setTipoGrupo(e.target.value)}
+                    disabled={!isSystemAdmin}
+                    className={`${inputBaseClass} border-gray-200 ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                   >
                     <option value="publico">Publico</option>
                     <option value="privado">Privado</option>
@@ -588,35 +651,40 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="flex items-center gap-2 text-sm text-gray-800">
-                  <input type="checkbox" checked={servicoPreAssinado} onChange={(e) => setServicoPreAssinado(e.target.checked)} />
+                <label className={`flex items-center gap-2 text-sm ${!isSystemAdmin ? 'text-gray-400' : 'text-gray-800'}`}>
+                  <input type="checkbox" checked={servicoPreAssinado} onChange={(e) => isSystemAdmin && setServicoPreAssinado(e.target.checked)} disabled={!isSystemAdmin} />
                   Servico pre-assinado
                 </label>
-                <label className="flex items-center gap-2 text-sm text-gray-800">
-                  <input type="checkbox" checked={envioAutomaticoAcesso} onChange={(e) => setEnvioAutomaticoAcesso(e.target.checked)} />
+                <label className={`flex items-center gap-2 text-sm ${!isSystemAdmin ? 'text-gray-400' : 'text-gray-800'}`}>
+                  <input type="checkbox" checked={envioAutomaticoAcesso} onChange={(e) => isSystemAdmin && setEnvioAutomaticoAcesso(e.target.checked)} disabled={!isSystemAdmin} />
                   Envio automatico de acesso
                 </label>
-                <label className="flex items-center gap-2 text-sm text-gray-800">
-                  <input type="checkbox" checked={filaEsperaAtiva} onChange={(e) => setFilaEsperaAtiva(e.target.checked)} />
+                <label className={`flex items-center gap-2 text-sm ${!isSystemAdmin ? 'text-gray-400' : 'text-gray-800'}`}>
+                  <input type="checkbox" checked={filaEsperaAtiva} onChange={(e) => isSystemAdmin && setFilaEsperaAtiva(e.target.checked)} disabled={!isSystemAdmin} />
                   Fila de espera ativa
                 </label>
-                <label className="flex items-center gap-2 text-sm text-gray-800">
-                  <input type="checkbox" checked={necessitaAnalise} onChange={(e) => setNecessitaAnalise(e.target.checked)} />
+                <label className={`flex items-center gap-2 text-sm ${!isSystemAdmin ? 'text-gray-400' : 'text-gray-800'}`}>
+                  <input type="checkbox" checked={necessitaAnalise} onChange={(e) => isSystemAdmin && setNecessitaAnalise(e.target.checked)} disabled={!isSystemAdmin} />
                   Necessita analise
                 </label>
               </div>
-              <div className="space-y-1">
-                <label htmlFor="observacoesInternas" className={labelClass}>
-                  Observacoes internas
-                </label>
-                <textarea
-                  id="observacoesInternas"
-                  value={observacoesInternas}
-                  onChange={(e) => setObservacoesInternas(e.target.value)}
-                  className={`${inputBaseClass} border-gray-200`}
-                  rows={2}
-                />
-              </div>
+              {canViewInternalNotes && (
+                <div className="space-y-1">
+                  <label htmlFor="observacoesInternas" className={labelClass}>
+                    Observacoes internas
+                    {!isSystemAdmin && <span className="text-xs font-normal text-gray-400">(somente leitura)</span>}
+                  </label>
+                  <textarea
+                    id="observacoesInternas"
+                    value={observacoesInternas}
+                    onChange={(e) => isSystemAdmin && setObservacoesInternas(e.target.value)}
+                    readOnly={!isSystemAdmin}
+                    disabled={!isSystemAdmin}
+                    className={`${inputBaseClass} border-gray-200 ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
+                    rows={2}
+                  />
+                </div>
+              )}
             </section>
 
             <section className={sectionClass} aria-labelledby="conteudos-heading">
@@ -628,14 +696,16 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className={labelClass}>Beneficios *</label>
-                  <button
-                    type="button"
-                    onClick={() => adicionarItem(setBeneficios, beneficios, prompt('Novo beneficio') || '')}
-                    className="text-sm text-blue-600 hover:underline"
-                    aria-label="Adicionar beneficio"
-                  >
-                    + adicionar
-                  </button>
+                  {isSystemAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => adicionarItem(setBeneficios, beneficios, prompt('Novo beneficio') || '')}
+                      className="text-sm text-blue-600 hover:underline"
+                      aria-label="Adicionar beneficio"
+                    >
+                      + adicionar
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {beneficios.map((b, idx) => (
@@ -644,18 +714,22 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                         aria-label={`Beneficio ${idx + 1}`}
                         value={b}
                         onChange={(e) =>
-                          setBeneficios(beneficios.map((item, i) => (i === idx ? e.target.value : item)))
+                          isSystemAdmin && setBeneficios(beneficios.map((item, i) => (i === idx ? e.target.value : item)))
                         }
-                        className={`${inputBaseClass} ${errors.beneficios ? 'border-red-500' : 'border-gray-200'}`}
+                        readOnly={!isSystemAdmin}
+                        disabled={!isSystemAdmin}
+                        className={`${inputBaseClass} ${errors.beneficios ? 'border-red-500' : 'border-gray-200'} ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                       />
-                      <button
-                        type="button"
-                        onClick={() => removerItem(setBeneficios, beneficios, idx)}
-                        className="px-3 py-2 text-sm rounded bg-gray-100 hover:bg-gray-200"
-                        aria-label="Remover beneficio"
-                      >
-                        ×
-                      </button>
+                      {isSystemAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => removerItem(setBeneficios, beneficios, idx)}
+                          className="px-3 py-2 text-sm rounded bg-gray-100 hover:bg-gray-200"
+                          aria-label="Remover beneficio"
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                   ))}
                   {errors.beneficios && <p className={errorClass}>{errors.beneficios}</p>}
@@ -670,8 +744,9 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                   <select
                     id="fidelidade-periodo"
                     value={fidelidadePeriodo}
-                    onChange={(e) => setFidelidadePeriodo(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    onChange={(e) => isSystemAdmin && setFidelidadePeriodo(e.target.value)}
+                    disabled={!isSystemAdmin}
+                    className={`${inputBaseClass} border-gray-200 ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                   >
                     <option>1 mes</option>
                     <option>3 meses</option>
@@ -686,7 +761,8 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                       id="renovacao"
                       type="checkbox"
                       checked={fidelidadeRenovacao}
-                      onChange={(e) => setFidelidadeRenovacao(e.target.checked)}
+                      onChange={(e) => isSystemAdmin && setFidelidadeRenovacao(e.target.checked)}
+                      disabled={!isSystemAdmin}
                       className="h-4 w-4"
                     />
                     <label htmlFor="renovacao" className="text-sm text-gray-700">
@@ -701,8 +777,10 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                   <input
                     id="fidelidade-observacoes"
                     value={fidelidadeObservacoes}
-                    onChange={(e) => setFidelidadeObservacoes(e.target.value)}
-                    className={`${inputBaseClass} border-gray-200`}
+                    onChange={(e) => isSystemAdmin && setFidelidadeObservacoes(e.target.value)}
+                    readOnly={!isSystemAdmin}
+                    disabled={!isSystemAdmin}
+                    className={`${inputBaseClass} border-gray-200 ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                   />
                 </div>
               </div>
@@ -710,14 +788,16 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className={labelClass}>Regras *</label>
-                  <button
-                    type="button"
-                    onClick={() => adicionarItem(setRegras, regras, prompt('Nova regra') || '')}
-                    className="text-sm text-blue-600 hover:underline"
-                    aria-label="Adicionar regra"
-                  >
-                    + adicionar
-                  </button>
+                  {isSystemAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => adicionarItem(setRegras, regras, prompt('Nova regra') || '')}
+                      className="text-sm text-blue-600 hover:underline"
+                      aria-label="Adicionar regra"
+                    >
+                      + adicionar
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {regras.map((regra, idx) => (
@@ -726,18 +806,22 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                         aria-label={`Regra ${idx + 1}`}
                         value={regra}
                         onChange={(e) =>
-                          setRegras(regras.map((item, i) => (i === idx ? e.target.value : item)))
+                          isSystemAdmin && setRegras(regras.map((item, i) => (i === idx ? e.target.value : item)))
                         }
-                        className="bg-transparent focus:outline-none text-sm w-40"
+                        readOnly={!isSystemAdmin}
+                        disabled={!isSystemAdmin}
+                        className={`bg-transparent focus:outline-none text-sm w-40 ${!isSystemAdmin ? 'cursor-default' : ''}`}
                       />
-                      <button
-                        type="button"
-                        onClick={() => removerItem(setRegras, regras, idx)}
-                        className="text-gray-600 hover:text-gray-900"
-                        aria-label="Remover regra"
-                      >
-                        ×
-                      </button>
+                      {isSystemAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => removerItem(setRegras, regras, idx)}
+                          className="text-gray-600 hover:text-gray-900"
+                          aria-label="Remover regra"
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -753,8 +837,10 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                   aria-required="true"
                   aria-invalid={!!errors.linkOficial}
                   value={linkOficial}
-                  onChange={(e) => setLinkOficial(e.target.value)}
-                  className={`${inputBaseClass} ${errors.linkOficial ? 'border-red-500' : 'border-gray-200'}`}
+                  onChange={(e) => isSystemAdmin && setLinkOficial(e.target.value)}
+                  readOnly={!isSystemAdmin}
+                  disabled={!isSystemAdmin}
+                  className={`${inputBaseClass} ${errors.linkOficial ? 'border-red-500' : 'border-gray-200'} ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                 />
                 <p className={helperClass}>URL completa (http/https).</p>
                 {errors.linkOficial && <p className={errorClass}>{errors.linkOficial}</p>}
@@ -811,8 +897,10 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                       <input
                         aria-required="true"
                         value={item.pergunta}
-                        onChange={(e) => atualizarFaq(idx, 'pergunta', e.target.value)}
-                        className={`${inputBaseClass} ${errors.faq ? 'border-red-500' : 'border-gray-200'}`}
+                        onChange={(e) => isSystemAdmin && atualizarFaq(idx, 'pergunta', e.target.value)}
+                        readOnly={!isSystemAdmin}
+                        disabled={!isSystemAdmin}
+                        className={`${inputBaseClass} ${errors.faq ? 'border-red-500' : 'border-gray-200'} ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                       />
                     </div>
                     <div className="space-y-1">
@@ -820,45 +908,84 @@ export default function EditarGrupo({ grupo, participantes = [] }) {
                       <input
                         aria-required="true"
                         value={item.resposta}
-                        onChange={(e) => atualizarFaq(idx, 'resposta', e.target.value)}
-                        className={`${inputBaseClass} ${errors.faq ? 'border-red-500' : 'border-gray-200'}`}
+                        onChange={(e) => isSystemAdmin && atualizarFaq(idx, 'resposta', e.target.value)}
+                        readOnly={!isSystemAdmin}
+                        disabled={!isSystemAdmin}
+                        className={`${inputBaseClass} ${errors.faq ? 'border-red-500' : 'border-gray-200'} ${!isSystemAdmin ? 'bg-gray-50' : ''}`}
                       />
                     </div>
-                    <div className="sm:col-span-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removerFaq(idx)}
-                        className="text-sm text-red-600 hover:underline"
-                        aria-label="Remover pergunta"
-                      >
-                        Remover
-                      </button>
-                    </div>
+                    {isSystemAdmin && (
+                      <div className="sm:col-span-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => removerFaq(idx)}
+                          className="text-sm text-red-600 hover:underline"
+                          aria-label="Remover pergunta"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={adicionarFaq}
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  + adicionar pergunta
-                </button>
+                {isSystemAdmin && (
+                  <button
+                    type="button"
+                    onClick={adicionarFaq}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    + adicionar pergunta
+                  </button>
+                )}
                 {errors.faq && <p className={errorClass}>{errors.faq}</p>}
               </div>
             </section>
 
             <div className="sticky bottom-0 bg-gray-50 py-4 border-t border-gray-200">
-              <div className="max-w-5xl mx-auto">
-                <button
-                  type="submit"
-                  className="w-full bg-green-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-green-700 transition disabled:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                  disabled={salvando}
-                  aria-busy={salvando}
-                >
-                  {salvando ? 'Salvando...' : 'Salvar alteracoes'}
-                </button>
-                {sucesso && <p className="mt-3 text-green-700 text-sm">{sucesso}</p>}
-                {msg && !sucesso && <p className="mt-3 text-red-600 text-sm">{msg}</p>}
+              <div className="max-w-5xl mx-auto space-y-3">
+                {isSystemAdmin ? (
+                  <button
+                    type="submit"
+                    className="w-full bg-green-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-green-700 transition disabled:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                    disabled={salvando}
+                    aria-busy={salvando}
+                  >
+                    {salvando ? 'Salvando...' : 'Salvar alteracoes'}
+                  </button>
+                ) : confirmCancel ? (
+                  <div className="bg-red-50 border border-red-300 rounded-lg p-4 space-y-3">
+                    <p className="text-red-700 text-sm font-semibold">Confirmar cancelamento do grupo?</p>
+                    <p className="text-red-600 text-xs">Esta ação alterará o status do grupo para cancelado. Os membros perderão o acesso.</p>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={handleCancelar}
+                        disabled={salvando}
+                        className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        {salvando ? 'Cancelando...' : 'Confirmar cancelamento'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCancel(false)}
+                        disabled={salvando}
+                        className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 disabled:opacity-50"
+                      >
+                        Voltar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmCancel(true)}
+                    className="w-full bg-red-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  >
+                    Cancelar grupo
+                  </button>
+                )}
+                {sucesso && <p className="text-green-700 text-sm">{sucesso}</p>}
+                {msg && !sucesso && <p className="text-red-600 text-sm">{msg}</p>}
               </div>
             </div>
           </form>

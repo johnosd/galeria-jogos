@@ -3,6 +3,8 @@ import { authOptions } from '../auth/[...nextauth]';
 import { getDb } from '../../../lib/mongodb';
 import { calculateBalances, getSessionUserId } from '../../../lib/wallet';
 import { hasRole, isUserBlocked } from '../../../lib/authz';
+import { logAudit } from '../../../lib/audit';
+import { getClientIp } from '../../../lib/ratelimit';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -64,6 +66,17 @@ export default async function handler(req, res) {
     );
 
     const balances = await calculateBalances(withdrawal.walletId);
+
+    logAudit({
+      action: 'withdrawal.approved',
+      actorId: adminId,
+      actorEmail: session.user.email,
+      targetId: withdrawalId,
+      targetCollection: 'withdrawals',
+      details: { amount: withdrawal.amount, userId: withdrawal.userId, walletId: withdrawal.walletId },
+      ip: getClientIp(req),
+    });
+
     return res.status(200).json({
       withdrawalId,
       status: withdrawalUpdate.value?.status || 'paid',

@@ -1,7 +1,15 @@
 // pages/api/atualizarPerfil.js
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./auth/[...nextauth]";
 import clientPromise from "../../lib/mongodb";
+import { decryptCPF, encryptCPF } from "../../lib/encryption";
 
 export default async function handler(req, res) {
+  const session = await getServerSession(req, res, authOptions);
+  if (!session) {
+    return res.status(401).json({ message: "Nao autenticado." });
+  }
+
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB);
 
@@ -9,9 +17,18 @@ export default async function handler(req, res) {
     try {
       const { email } = req.query;
       if (!email) return res.status(400).json({ message: "Email e obrigatorio." });
+
+      const isAdmin = session.user.systemRole === "admin";
+      if (!isAdmin && email !== session.user.email) {
+        return res.status(403).json({ message: "Acesso negado." });
+      }
+
       const user = await db.collection("users").findOne({ email });
       if (!user) return res.status(404).json({ message: "Usuario nao encontrado." });
-      return res.status(200).json(user);
+
+      const { systemRole, isBlocked, ...dadosPublicos } = user;
+      if (dadosPublicos.cpf) dadosPublicos.cpf = decryptCPF(dadosPublicos.cpf);
+      return res.status(200).json(dadosPublicos);
     } catch (error) {
       console.error("Erro ao carregar perfil:", error);
       return res.status(500).json({ message: "Erro ao carregar perfil." });
@@ -31,16 +48,17 @@ export default async function handler(req, res) {
     username,
     cpf,
     endereco = {},
-    systemRole,
-    isBlocked,
   } = req.body;
 
   if (!email || !username || !nome || !sobrenome) {
     return res.status(400).json({ message: "Nome, sobrenome, email e username sao obrigatorios." });
   }
 
+  if (email !== session.user.email) {
+    return res.status(403).json({ message: "Acesso negado." });
+  }
+
   const usernameLimpo = username.trim().replace(/\s/g, "");
-  const systemRolesPermitidos = ["user", "support", "finance", "admin"];
 
   try {
     const usuarioAtual = await db.collection("users").findOne({ email });
@@ -67,12 +85,6 @@ export default async function handler(req, res) {
       complemento: endereco.complemento || "",
     };
 
-    const systemRoleSanitizado = systemRolesPermitidos.includes(systemRole)
-      ? systemRole
-      : usuarioAtual.systemRole || "user";
-    const isBlockedNormalizado =
-      typeof isBlocked === "boolean" ? isBlocked : usuarioAtual.isBlocked ?? false;
-
     await db.collection("users").updateOne(
       { email },
       {
@@ -82,10 +94,8 @@ export default async function handler(req, res) {
           image: imagem,
           telefone,
           username: usernameLimpo,
-          cpf: cpf || "",
+          cpf: encryptCPF(cpf || ""),
           endereco: enderecoSanitizado,
-          systemRole: systemRoleSanitizado,
-          isBlocked: isBlockedNormalizado,
         },
       }
     );

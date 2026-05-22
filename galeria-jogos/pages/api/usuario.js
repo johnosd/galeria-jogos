@@ -1,31 +1,45 @@
 // pages/api/usuario.js
-import { getSession } from "next-auth/react";
-import { MongoClient } from "mongodb";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./auth/[...nextauth]";
+import { getDb } from "../../lib/mongodb";
+import { decryptCPF } from "../../lib/encryption";
 
 export default async function handler(req, res) {
-  const session = await getSession({ req });
+  const session = await getServerSession(req, res, authOptions);
 
   if (!session) {
-    return res.status(401).json({ message: "Não autorizado" });
+    return res.status(401).json({ message: "Nao autorizado" });
   }
 
   try {
-    const client = await MongoClient.connect(process.env.MONGODB_URI);
-    const db = client.db(process.env.MONGODB_DB);
+    const db = await getDb();
 
-    const usuario = await db
-      .collection("users")
-      .findOne({ email: session.user.email });
-
-    client.close();
+    const usuario = await db.collection("users").findOne(
+      { email: session.user.email },
+      {
+        projection: {
+          nome: 1,
+          sobrenome: 1,
+          email: 1,
+          image: 1,
+          telefone: 1,
+          username: 1,
+          cpf: 1,
+          endereco: 1,
+          contaValidada: 1,
+          createdAt: 1,
+        },
+      }
+    );
 
     if (!usuario) {
-      return res.status(404).json({ message: "Usuário não encontrado" });
+      return res.status(404).json({ message: "Usuario nao encontrado" });
     }
 
+    if (usuario.cpf) usuario.cpf = decryptCPF(usuario.cpf);
     return res.status(200).json(usuario);
   } catch (error) {
-    console.error("Erro ao buscar dados do usuário:", error);
+    console.error("Erro ao buscar dados do usuario:", error);
     return res.status(500).json({ message: "Erro interno do servidor" });
   }
 }

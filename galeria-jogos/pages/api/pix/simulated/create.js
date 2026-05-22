@@ -2,6 +2,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]';
 import { insertPayment } from '../../../../lib/mongodb';
 import { ensureWallet, getSessionUserId, normalizeAmount } from '../../../../lib/wallet';
+import { checkRateLimit } from '../../../../lib/ratelimit';
+import { encryptCPF } from '../../../../lib/encryption';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,6 +16,18 @@ export default async function handler(req, res) {
     const userId = getSessionUserId(session);
     if (!session || !userId) {
       return res.status(401).json({ error: 'Nao autenticado' });
+    }
+    if (!session.user.contaValidada) {
+      return res.status(403).json({ error: 'Conta nao verificada. Confirme seu e-mail para realizar pagamentos.' });
+    }
+
+    const { allowed } = await checkRateLimit({
+      key: `pix:${userId}`,
+      max: 5,
+      windowMs: 60 * 60 * 1000, // 1 hora
+    });
+    if (!allowed) {
+      return res.status(429).json({ error: 'Limite de pagamentos atingido. Tente novamente em 1 hora.' });
     }
 
     const amount = normalizeAmount(req.body?.amount);
@@ -42,7 +56,7 @@ export default async function handler(req, res) {
     const payment = await insertPayment({
       userId,
       gateway: 'simulated',
-      pixCpf: cpfRaw,
+      pixCpf: encryptCPF(cpfRaw),
       amount,
       status: 'pending',
     });

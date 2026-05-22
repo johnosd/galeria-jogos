@@ -1,4 +1,6 @@
 import { ObjectId } from 'mongodb';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]';
 import clientPromise from '../../../../lib/mongodb';
 
 const parseObjectId = (value) => {
@@ -12,14 +14,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Metodo nao permitido' });
   }
 
+  const session = await getServerSession(req, res, authOptions);
+  const sessionUserId = session?.user?.id || session?.user?._id || session?.user?.sub;
+  if (!session || !sessionUserId) {
+    return res.status(401).json({ error: 'Nao autenticado' });
+  }
+  if (!session.user.contaValidada) {
+    return res.status(403).json({ error: 'Conta nao verificada. Confirme seu e-mail para entrar em grupos.' });
+  }
+
   const { id } = req.query;
   if (!ObjectId.isValid(id)) {
     return res.status(400).json({ error: 'ID do grupo invalido' });
   }
 
-  const { userId } = req.body || {};
-  if (!userId) {
-    return res.status(400).json({ error: 'userId obrigatorio' });
+  // Admin/support podem adicionar outro usuário via body; demais só podem adicionar a si mesmos
+  const isStaff = ['admin', 'support'].includes(session.user.systemRole);
+  const bodyUserId = req.body?.userId;
+  const userId = (isStaff && bodyUserId) ? bodyUserId : sessionUserId;
+
+  if (!isStaff && bodyUserId && String(bodyUserId) !== String(sessionUserId)) {
+    return res.status(403).json({ error: 'Sem permissao para adicionar outro usuario' });
   }
 
   try {

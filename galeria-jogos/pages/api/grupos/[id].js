@@ -2,6 +2,7 @@ import clientPromise from '../../../lib/mongodb';
 import { ObjectId, Int32, Double } from 'mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]';
+import { deleteFromR2, hasR2Config } from '../../../lib/r2';
 
 const parseNumero = (valor, padrao = 0) => {
   const numero = Number(valor);
@@ -190,8 +191,21 @@ export default async function handler(req, res) {
       const resultado = await db.collection('grupos').deleteOne({ _id: grupoId });
       if (resultado.deletedCount === 0) return res.status(404).json({ error: 'Grupo nao encontrado' });
 
-      // Remove participantes associados ao grupo
       await db.collection('membrosGrupo').deleteMany({ grupoId });
+
+      if (hasR2Config()) {
+        const safeKeyFromUrl = (url) => {
+          try { return new URL(url).pathname.replace(/^\/+/, ''); } catch { return null; }
+        };
+        const r2Key = grupo.imageKey
+          || safeKeyFromUrl(grupo.imageUrl)
+          || safeKeyFromUrl(grupo.capa);
+        if (r2Key) {
+          try { await deleteFromR2(r2Key); } catch (err) {
+            console.warn('Falha ao deletar imagem do R2 apos excluir grupo:', err?.message);
+          }
+        }
+      }
 
       return res.status(200).json({ message: 'Grupo excluido com sucesso' });
     } catch (error) {
@@ -237,6 +251,18 @@ export default async function handler(req, res) {
     linkOficial = '',
   } = req.body || {};
 
+  // Campos que só o admin do sistema pode alterar — para outros perfis, força os valores do BD
+  const isSystemAdmin = session.user?.systemRole === 'admin';
+  const categoriaEfetiva = isSystemAdmin ? categoria : (grupo.categoria || categoria);
+  const acessoEfetivo = isSystemAdmin ? acesso : (grupo.acesso || acesso);
+  const tempoEntregaEfetivo = isSystemAdmin ? tempoEntrega : (grupo.tempoEntrega || tempoEntrega);
+  const tipoGrupoEfetivo = isSystemAdmin ? tipoGrupo : (grupo.tipoGrupo || tipoGrupo);
+  const servicoPreAssinadoEfetivo = isSystemAdmin ? Boolean(servicoPreAssinado) : Boolean(grupo.servicoPreAssinado);
+  const envioAutomaticoAcessoEfetivo = isSystemAdmin ? Boolean(envioAutomaticoAcesso) : Boolean(grupo.envioAutomaticoAcesso);
+  const filaEsperaAtivaEfetiva = isSystemAdmin ? Boolean(filaEsperaAtiva) : Boolean(grupo.filaEsperaAtiva);
+  const necessitaAnaliseEfetivo = isSystemAdmin ? Boolean(necessitaAnalise) : Boolean(grupo.necessitaAnalise);
+  const observacoesInternasEfetiva = isSystemAdmin ? (observacoesInternas || '') : (grupo.observacoesInternas || '');
+
   const valorTotalNumero = normalizarPreco(valorTotal);
   const valorPorVagaNumero = normalizarPreco(valorPorVaga);
   const capacidadeNumero = Math.trunc(parseNumero(capacidadeTotal));
@@ -256,7 +282,7 @@ export default async function handler(req, res) {
   if (vagasReservadasNumero > capacidadeNumero) {
     return res.status(400).json({ error: 'Vagas reservadas nao podem exceder a capacidade' });
   }
-  if (!categoria || !CATEGORIAS_PERMITIDAS.includes(categoria)) {
+  if (!categoriaEfetiva || !CATEGORIAS_PERMITIDAS.includes(categoriaEfetiva)) {
     return res.status(400).json({ error: 'Categoria invalida' });
   }
 
@@ -283,18 +309,18 @@ export default async function handler(req, res) {
           vagasReservadasAdmin: new Int32(vagasReservadasNumero),
           vagasDisponiveis: new Int32(vagasDisponiveisNumero),
           subtitulo,
-          acesso,
-          tempoEntrega,
+          acesso: acessoEfetivo,
+          tempoEntrega: tempoEntregaEfetivo,
           confiabilidade,
-          categoria,
-          tipoGrupo,
+          categoria: categoriaEfetiva,
+          tipoGrupo: tipoGrupoEfetivo,
           status,
           statusDetalhado,
-          servicoPreAssinado: Boolean(servicoPreAssinado),
-          envioAutomaticoAcesso: Boolean(envioAutomaticoAcesso),
-          filaEsperaAtiva: Boolean(filaEsperaAtiva),
-          necessitaAnalise: Boolean(necessitaAnalise),
-          observacoesInternas: observacoesInternas || '',
+          servicoPreAssinado: servicoPreAssinadoEfetivo,
+          envioAutomaticoAcesso: envioAutomaticoAcessoEfetivo,
+          filaEsperaAtiva: filaEsperaAtivaEfetiva,
+          necessitaAnalise: necessitaAnaliseEfetivo,
+          observacoesInternas: observacoesInternasEfetiva,
           beneficios: parseLista(beneficios),
           fidelidade: parseFidelidade({ fidelidadePeriodo, fidelidadeRenovacao, fidelidadeObservacoes }),
           regras: parseLista(regras),

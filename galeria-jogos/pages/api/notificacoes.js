@@ -1,11 +1,21 @@
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./auth/[...nextauth]";
 import clientPromise from "../../lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
+  const session = await getServerSession(req, res, authOptions);
+  if (!session) return res.status(401).json({ message: "Nao autenticado" });
+
   if (req.method === "GET") {
     const { userId, lido } = req.query;
     if (!userId || !ObjectId.isValid(userId)) {
       return res.status(400).json({ message: "userId invalido" });
+    }
+
+    const isAdmin = session.user.systemRole === "admin";
+    if (!isAdmin && String(session.user.id) !== String(userId)) {
+      return res.status(403).json({ message: "Acesso negado" });
     }
 
     try {
@@ -32,6 +42,11 @@ export default async function handler(req, res) {
     const { userId, notificacaoId } = req.body || {};
     if (!userId || !ObjectId.isValid(userId) || !notificacaoId || !ObjectId.isValid(notificacaoId)) {
       return res.status(400).json({ message: "Parametros invalidos" });
+    }
+
+    const isAdmin = session.user.systemRole === "admin";
+    if (!isAdmin && String(session.user.id) !== String(userId)) {
+      return res.status(403).json({ message: "Acesso negado" });
     }
 
     try {

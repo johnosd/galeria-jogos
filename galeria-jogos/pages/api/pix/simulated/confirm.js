@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]';
-import { getDb } from '../../../../lib/mongodb';
+import { getClient, getDb } from '../../../../lib/mongodb';
 import { calculateBalances, ensureWallet, getSessionUserId, normalizeAmount } from '../../../../lib/wallet';
 
 export default async function handler(req, res) {
@@ -93,41 +93,38 @@ export default async function handler(req, res) {
       });
     }
 
-    const updatedPayment = await db.collection('payments').findOneAndUpdate(
-      { _id: paymentId, userId, status: 'pending' },
-      { $set: { status: 'confirmed' } },
-      { returnDocument: 'after' }
-    );
-
-    if (!updatedPayment.value) {
-      const latest = await db.collection('payments').findOne({ _id: paymentId, userId });
-      if (latest?.status === 'confirmed') {
-        const creditAmountLatest = normalizeAmount(latest.amount);
-        const ledgerDoc = await confirmAndGetLedger(creditAmountLatest);
-        const balances = await calculateBalances(wallet._id);
-        return res.status(200).json({
-          paymentId,
-          status: 'confirmed',
-          ledgerId: ledgerDoc?._id,
-          ledgerStatus: ledgerDoc?.status,
-          ledgerAmount: ledgerDoc?.amount,
-          ledgerSource: ledgerDoc?.source,
-          walletId: wallet._id,
-          balance: balances.balance,
-          available: balances.available,
-        });
-      }
-      return res.status(400).json({ error: 'Pagamento nao esta pendente' });
-    }
-
-    const creditAmount = normalizeAmount(updatedPayment.value?.amount ?? payment.amount);
+    const creditAmount = normalizeAmount(payment.amount);
     if (!Number.isFinite(creditAmount) || creditAmount <= 0) {
       return res.status(400).json({ error: 'Valor do pagamento invalido' });
     }
 
-    const ledgerEntry = await confirmAndGetLedger(creditAmount);
+    const mongoClient = await getClient();
+    const txSession = mongoClient.startSession();
+    let ledgerEntry;
+    try {
+      await txSession.withTransaction(async () => {
+        const result = await db.collection('payments').findOneAndUpdate(
+          { _id: paymentId, userId, status: 'pending' },
+          { $set: { status: 'confirmed' } },
+          { returnDocument: 'after', session: txSession }
+        );
+
+        // Pagamento já confirmado — garante idempotência sem erro
+        const confirmedPayment = result ?? await db.collection('payments').findOne(
+          { _id: paymentId, userId, status: 'confirmed' },
+          { session: txSession }
+        );
+        if (!confirmedPayment) {
+          throw Object.assign(new Error('Pagamento nao esta pendente'), { statusCode: 400 });
+        }
+
+        ledgerEntry = await confirmAndGetLedger(creditAmount);
+      });
+    } finally {
+      await txSession.endSession();
+    }
+
     if (!ledgerEntry?._id) {
-      console.error('PIX confirm: ledger nao retornou id', ledgerEntry);
       throw new Error('Falha ao criar registro de credito no ledger');
     }
 

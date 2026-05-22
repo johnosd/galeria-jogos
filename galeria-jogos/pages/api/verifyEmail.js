@@ -31,7 +31,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "Codigo expirado." });
     }
 
-    if (record.codigo !== codigo) {
+    if (record.codigo !== codigo.toUpperCase()) {
       await db
         .collection("verificationCodes")
         .updateOne({ _id: record._id }, { $inc: { tentativas: 1 } });

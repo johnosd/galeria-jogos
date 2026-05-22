@@ -341,10 +341,19 @@ export default function GrupoDetalhe({ grupo }) {
                   <Badge text="CTA em destaque" variant="info" />
                 </div>
                 <p className="text-sm text-gray-700">Pagamento mensal, renovacao automatica e acompanhamento do acesso pelo administrador.</p>
-                {jaMembro || isAdmin ? (
+                {isAdmin ? (
                   <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-gray-300 text-gray-600">
-                    <FaWhatsapp /> {jaMembro ? 'Voce ja participa' : 'Administrador do grupo'}
+                    <FaWhatsapp /> Administrador do grupo
                   </div>
+                ) : jaMembro ? (
+                  <Link
+                    href={whatsappLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold shadow bg-green-600 text-white hover:bg-green-700"
+                  >
+                    <FaWhatsapp /> Acessar grupo no WhatsApp
+                  </Link>
                 ) : (
                   <Link
                     href={
@@ -554,18 +563,31 @@ export default function GrupoDetalhe({ grupo }) {
             <p className="text-xs text-gray-600">Entrar no grupo</p>
             <p className="text-lg font-bold text-gray-900">R$ {preco.toFixed(2)}/mes</p>
           </div>
-          {jaMembro || isAdmin ? (
+          {isAdmin ? (
             <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-full font-semibold shadow bg-gray-300 text-gray-600">
-              <FaWhatsapp /> {jaMembro ? 'Voce ja participa' : 'Administrador do grupo'}
+              <FaWhatsapp /> Administrador do grupo
             </div>
-          ) : (
+          ) : jaMembro ? (
             <Link
               href={whatsappLink}
               target="_blank"
               rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-3 rounded-full font-semibold shadow hover:bg-green-700 transition"
+            >
+              <FaWhatsapp /> Acessar WhatsApp
+            </Link>
+          ) : (
+            <Link
+              href={
+                isAuthenticated
+                  ? whatsappLink
+                  : `/auth/signin?callbackUrl=${encodeURIComponent(router.asPath || '')}`
+              }
+              target={isAuthenticated ? '_blank' : undefined}
+              rel={isAuthenticated ? 'noopener noreferrer' : undefined}
               className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-full font-semibold shadow hover:bg-blue-700 transition"
             >
-              <FaWhatsapp /> Entrar
+              <FaWhatsapp /> {isAuthenticated ? 'Entrar' : 'Entrar para participar'}
             </Link>
           )}
         </div>
