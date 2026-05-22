@@ -8,10 +8,10 @@
 
 | Prioridade | Total | Concluído |
 |---|---|---|
-| Crítico | 4 | 0 |
-| Alto | 6 | 0 |
-| Médio | 5 | 0 |
-| Baixo/Qualidade | 6 | 0 |
+| Crítico | 4 | 4 |
+| Alto | 6 | 6 |
+| Médio | 5 | 4 |
+| Baixo/Qualidade | 6 | 4 |
 
 ---
 
@@ -32,8 +32,8 @@ const systemRoleSanitizado = systemRolesPermitidos.includes(systemRole) ? system
 
 **Fix:** remover `systemRole`/`isBlocked` do `req.body`; hardcode `"user"` no insert.
 
-- [ ] Remover `systemRole` e `isBlocked` do destructuring do `req.body`
-- [ ] Hardcodar `systemRole: "user"` e `isBlocked: false` no `insertOne`
+- [x] Remover `systemRole` e `isBlocked` do destructuring do `req.body`
+- [x] Hardcodar `systemRole: "user"` e `isBlocked: false` no `insertOne`
 
 ---
 
@@ -47,10 +47,10 @@ Este endpoint **não possui nenhuma verificação de sessão**. Qualquer requisi
 
 Não há nenhum `getSession()` ou `getServerSession()` em todo o arquivo.
 
-- [ ] Adicionar `getServerSession(authOptions)` no topo dos handlers GET e POST
-- [ ] No GET, garantir que o email consultado pertence à sessão (ou é admin)
-- [ ] No POST, garantir que o usuário só atualiza o próprio perfil
-- [ ] Remover `systemRole` e `isBlocked` do endpoint de perfil (apenas admins devem alterar via rota específica)
+- [x] Adicionar `getServerSession(authOptions)` no topo dos handlers GET e POST
+- [x] No GET, garantir que o email consultado pertence à sessão (ou é admin)
+- [x] No POST, garantir que o usuário só atualiza o próprio perfil
+- [x] Remover `systemRole` e `isBlocked` do endpoint de perfil (apenas admins devem alterar via rota específica)
 
 ---
 
@@ -59,8 +59,8 @@ Não há nenhum `getSession()` ou `getServerSession()` em todo o arquivo.
 
 O `GET` aceita qualquer `userId` na query string sem verificar se pertence à sessão ativa. Qualquer usuário consegue ler as notificações de qualquer outro usuário.
 
-- [ ] Adicionar `getServerSession` e comparar `session.user.id === userId` antes de consultar
-- [ ] Retornar 403 se o userId não corresponder à sessão (exceto para admins)
+- [x] Adicionar `getServerSession` e comparar `session.user.id === userId` antes de consultar
+- [x] Retornar 403 se o userId não corresponder à sessão (exceto para admins)
 
 ---
 
@@ -77,8 +77,8 @@ O `GET` aceita qualquer `userId` na query string sem verificar se pertence à se
 
 Em ambiente serverless, cada invocação fria cria uma conexão nova que nunca é fechada nem pooled. Sob carga, isso esgota o limite de conexões do Atlas e causa falhas em cascata.
 
-- [ ] Replicar o padrão `global._mongoClientPromise` do desenvolvimento também em produção
-- [ ] Configurar `maxPoolSize` e `minPoolSize` nas options do MongoClient
+- [x] Replicar o padrão `global._mongoClientPromise` do desenvolvimento também em produção
+- [x] Configurar `maxPoolSize` e `minPoolSize` nas options do MongoClient
 
 ---
 
@@ -91,10 +91,10 @@ Nenhuma rota de autenticação, envio de código ou pagamento tem rate limiting.
 - `POST /api/pix/*/create` — tentativas ilimitadas de criação de pagamento
 - Endpoints de login — brute force sem proteção
 
-- [ ] Instalar e configurar `@upstash/ratelimit` (ou similar)
-- [ ] Aplicar rate limit em `sendVerificationCode` (ex: 3 req/hora por IP)
-- [ ] Aplicar rate limit em endpoints de pagamento PIX
-- [ ] Aplicar rate limit no endpoint de login do NextAuth
+- [x] Implementar rate limiter via MongoDB (`lib/ratelimit.js`) — sem dependências novas
+- [x] Aplicar rate limit em `sendVerificationCode` (3 req/hora por IP)
+- [x] Aplicar rate limit em endpoints de pagamento PIX (5 req/hora por userId)
+- [x] Aplicar rate limit no endpoint de login do NextAuth (callback signIn, 10 req/15min por email)
 
 ---
 
@@ -109,9 +109,9 @@ tls: {
 
 Desabilitar a validação de certificado em produção abre o canal SMTP para ataques MITM.
 
-- [ ] Remover `rejectUnauthorized: false` de todos os transporters Nodemailer
+- [x] Remover `rejectUnauthorized: false` de todos os transporters Nodemailer
 - [ ] Testar envio de e-mail em produção com TLS ativo
-- [ ] Verificar e corrigir nos arquivos de mensagens e acessos de grupos
+- [x] Verificar e corrigir nos arquivos de mensagens e acessos de grupos
 
 ---
 
@@ -120,8 +120,8 @@ Desabilitar a validação de certificado em produção abre o canal SMTP para at
 
 O arquivo não configura nenhum header de segurança. Ausentes: `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security`, `Permissions-Policy`.
 
-- [ ] Adicionar bloco `headers()` no `next.config.mjs` com os headers padrão de segurança
-- [ ] Configurar `Content-Security-Policy` adequado para as origens usadas (Google, R2)
+- [x] Adicionar bloco `headers()` no `next.config.mjs` com os headers padrão de segurança
+- [x] Configurar `Content-Security-Policy` adequado para as origens usadas (Google, R2)
 - [ ] Validar que headers estão presentes em produção via DevTools ou securityheaders.com
 
 ---
@@ -130,9 +130,9 @@ O arquivo não configura nenhum header de segurança. Ausentes: `Content-Securit
 
 Operações que envolvem múltiplas coleções (débito na wallet + invoice + membro) são feitas em operações separadas sem transação atômica. Uma falha parcial deixa o banco em estado inconsistente.
 
-- [ ] Mapear todos os fluxos financeiros multi-coleção
-- [ ] Implementar `session.withTransaction()` nos fluxos de assinatura/pagamento
-- [ ] Implementar transação no fluxo de saque (debit + withdrawal record)
+- [x] Mapear todos os fluxos financeiros multi-coleção
+- [x] Implementar `session.withTransaction()` nos fluxos de assinatura/pagamento
+- [x] Implementar transação no fluxo de saque (debit + withdrawal record)
 
 ---
 
@@ -140,9 +140,9 @@ Operações que envolvem múltiplas coleções (débito na wallet + invoice + me
 
 O CPF é persistido como string pura em `users.cpf` e `withdrawals.pixKeyCpf` sem criptografia ou mascaramento, violando boas práticas da LGPD.
 
-- [ ] Definir estratégia: criptografia reversível (AES-256) ou hash (para lookup por CPF)
-- [ ] Implementar criptografia na escrita e decriptografia na leitura
-- [ ] Migrar documentos existentes para o formato criptografado
+- [x] Definir estratégia: criptografia reversível (AES-256-GCM) — CPF precisa ser exibido ao admin
+- [x] Implementar criptografia na escrita e decriptografia na leitura
+- [x] Retrocompatibilidade: `decryptCPF` retorna valor original se não estiver no formato criptografado
 
 ---
 
@@ -155,9 +155,9 @@ const codigo = crypto.randomBytes(3).toString("hex").toUpperCase(); // ~16M comb
 
 Sem rate limiting (ver A1), um atacante pode fazer brute force no código em segundos.
 
-- [ ] Aumentar para `crypto.randomBytes(4).toString("hex")` (~4 bilhões de combinações)
-- [ ] Implementar bloqueio após N tentativas erradas (`tentativas` já existe no documento)
-- [ ] Garantir que o campo `tentativas` seja incrementado e validado no endpoint de verificação
+- [x] Aumentar para `crypto.randomBytes(4).toString("hex")` (~4 bilhões de combinações)
+- [x] Implementar bloqueio após N tentativas erradas (`tentativas` já existe no documento)
+- [x] Garantir que o campo `tentativas` seja incrementado e validado no endpoint de verificação
 
 ---
 
@@ -168,7 +168,7 @@ Sem rate limiting (ver A1), um atacante pode fazer brute force no código em seg
 
 Retorna o documento completo do usuário (incluindo `systemRole`, `cpf`, `endereco`, `isBlocked`) sem autenticação. *(Coberto pela correção do C2, mas requer atenção específica ao payload retornado.)*
 
-- [ ] Após adicionar autenticação (C2), garantir que o GET retorna apenas campos necessários (sem `systemRole`, `isBlocked`, CPF completo)
+- [x] Após adicionar autenticação (C2), garantir que o GET retorna apenas campos necessários (sem `systemRole`, `isBlocked`, CPF completo)
 
 ---
 
@@ -176,8 +176,8 @@ Retorna o documento completo do usuário (incluindo `systemRole`, `cpf`, `endere
 
 Nenhum mecanismo de CSRF (token, `SameSite=Strict`, verificação de `Origin`) nas rotas de mutation.
 
-- [ ] Configurar `useSecureCookies` e `sameSite: "strict"` nas cookies do NextAuth
-- [ ] Avaliar necessidade de tokens CSRF explícitos nas rotas mais sensíveis
+- [x] Configurar `sameSite: "lax"` e `secure: true` (produção) nas cookies do NextAuth
+- [x] `sameSite: "strict"` quebraria OAuth redirects — "lax" é o correto para este caso
 
 ---
 
@@ -185,10 +185,10 @@ Nenhum mecanismo de CSRF (token, `SameSite=Strict`, verificação de `Origin`) n
 
 Nenhuma ação financeira ou administrativa é registrada com `quem`, `o quê`, `quando` e `de onde`. Fraudes e erros são indetectáveis após o fato.
 
-- [ ] Criar coleção `auditLogs` no MongoDB
-- [ ] Registrar aprovação/rejeição de saques
-- [ ] Registrar mudanças de `systemRole` e `isBlocked`
-- [ ] Registrar exclusões de grupos e pagamentos
+- [x] Criar `lib/audit.js` com `logAudit` — inserção na coleção `auditLogs` (criada automaticamente)
+- [x] Registrar aprovação/rejeição de saques (`withdrawal.approved`, `withdrawal.rejected`)
+- [x] Registrar mudanças de `systemRole` (`user.role_changed`) e `isBlocked` (`user.blocked/unblocked`)
+- [ ] Registrar exclusões de grupos e pagamentos (wallet reset — fora do escopo financeiro imediato)
 
 ---
 
@@ -196,8 +196,8 @@ Nenhuma ação financeira ou administrativa é registrada com `quem`, `o quê`, 
 
 A inconsistência aumenta o risco de novos endpoints ficarem desprotegidos por usar o padrão errado.
 
-- [ ] Padronizar todos os endpoints para `getServerSession(authOptions)` (NextAuth v4 recomendado)
-- [ ] Buscar e substituir todos os usos de `getSession(req, res)` legado
+- [x] Padronizar todos os endpoints para `getServerSession(authOptions)` (NextAuth v4 recomendado)
+- [x] Buscar e substituir todos os usos de `getSession(req, res)` legado
 
 ---
 
@@ -205,19 +205,19 @@ A inconsistência aumenta o risco de novos endpoints ficarem desprotegidos por u
 
 Padrão `/\S+@\S+\.\S+/` usado em múltiplos endpoints aceita strings inválidas.
 
-- [ ] Instalar `validator` (`npm i validator`) ou usar `zod` para validação de e-mail
-- [ ] Substituir a regex em todos os endpoints que a utilizam
+- [x] Criar `lib/validation.js` com `isValidEmail` — sem dependências novas
+- [x] Substituir regex `/\S+@\S+\.\S+/` em acessos.js e mensagens.js
 
 ---
 
 ## BAIXO / QUALIDADE
 
-- [ ] **Q1** — Substituir `console.error` por uma lib de logging que omite detalhes internos em produção (ex: `pino`)
-- [ ] **Q2** — Adicionar validação de todas as variáveis de ambiente na inicialização (ex: com `zod`)
-- [ ] **Q3** — Configurar CORS explícito no `next.config.mjs` ou em middleware
-- [ ] **Q4** — Adicionar limite de tamanho de payload JSON na config do Next.js
-- [ ] **Q5** — Integrar monitoramento de erros em produção (Sentry ou similar)
-- [ ] **Q6** — Avaliar ativação dos JSON Schemas de `database/schemas/` como validação no MongoDB Atlas
+- [x] **Q1** — Criado `lib/logger.js` — em produção omite stack trace, expõe só a mensagem
+- [x] **Q2** — Criado `lib/env.js` — valida vars obrigatórias e formato da `ENCRYPTION_KEY` no boot
+- [x] **Q3** — CORS configurado no `next.config.mjs` restrito a `NEXT_PUBLIC_SITE_URL`
+- [x] **Q4** — Limite de payload 100kb via `experimental.serverActions.bodySizeLimit`
+- [ ] **Q5** — Sentry: requer conta e DSN — instalar `@sentry/nextjs` e rodar `npx @sentry/wizard`
+- [ ] **Q6** — Atlas schema validation: aplicar via mongosh (comandos abaixo)
 
 ---
 

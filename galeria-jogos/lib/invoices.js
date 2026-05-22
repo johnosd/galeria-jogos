@@ -9,7 +9,7 @@ export const INVOICE_STATUS = {
   ESTORNADA: 'estornada',
 };
 
-export async function createInvoice({ userId, grupoId, amount, status, description = '', metadata = {} }) {
+export async function createInvoice({ userId, grupoId, amount, status, description = '', metadata = {} }, { session } = {}) {
   if (!userId || !grupoId) {
     throw new Error('userId e grupoId sao obrigatorios para a fatura');
   }
@@ -31,7 +31,7 @@ export async function createInvoice({ userId, grupoId, amount, status, descripti
     updatedAt: new Date(),
   };
 
-  await db.collection('invoices').insertOne(invoice);
+  await db.collection('invoices').insertOne(invoice, session ? { session } : undefined);
   return invoice;
 }
 
@@ -41,7 +41,7 @@ export async function getInvoiceById(invoiceId) {
   return db.collection('invoices').findOne({ _id: invoiceId });
 }
 
-export async function markInvoicePaid({ invoiceId, walletId, ledgerId, paidAt = new Date(), balanceSnapshot = {} }) {
+export async function markInvoicePaid({ invoiceId, walletId, ledgerId, paidAt = new Date(), balanceSnapshot = {} }, { session } = {}) {
   const db = await getDb();
   const updateResult = await db.collection('invoices').findOneAndUpdate(
     { _id: invoiceId },
@@ -55,7 +55,7 @@ export async function markInvoicePaid({ invoiceId, walletId, ledgerId, paidAt = 
         balanceSnapshot,
       },
     },
-    { returnDocument: 'after' }
+    { returnDocument: 'after', ...(session ? { session } : {}) }
   );
   return updateResult.value;
 }

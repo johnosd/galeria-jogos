@@ -3,6 +3,8 @@ import { ObjectId } from 'mongodb';
 import { authOptions } from '../../auth/[...nextauth]';
 import { getDb } from '../../../../../lib/mongodb';
 import { PERMISSIONS, hasRole } from '../../../../../lib/authz';
+import { logAudit } from '../../../../../lib/audit';
+import { getClientIp } from '../../../../../lib/ratelimit';
 
 export default async function handler(req, res) {
   if (req.method !== 'PUT') {
@@ -35,6 +37,16 @@ export default async function handler(req, res) {
     if (!updated.value) {
       return res.status(404).json({ error: 'Usuario nao encontrado' });
     }
+
+    logAudit({
+      action: isBlocked ? 'user.blocked' : 'user.unblocked',
+      actorId: session.user.id,
+      actorEmail: session.user.email,
+      targetId: id,
+      targetCollection: 'users',
+      details: { targetEmail: updated.value.email },
+      ip: getClientIp(req),
+    });
 
     return res.status(200).json({ isBlocked: updated.value.isBlocked === true });
   } catch (error) {

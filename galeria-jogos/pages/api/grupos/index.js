@@ -181,6 +181,9 @@ export default async function handler(req, res) {
     if (!session || !session.user?.id) {
       return res.status(401).json({ error: 'Nao autenticado' });
     }
+    if (!session.user.contaValidada) {
+      return res.status(403).json({ error: 'Conta nao verificada. Confirme seu e-mail para criar grupos.' });
+    }
 
     adminId = parseObjectId(session.user.id || session.user._id || session.user.sub);
     if (!adminId) {

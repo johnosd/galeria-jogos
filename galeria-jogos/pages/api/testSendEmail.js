@@ -13,9 +13,6 @@ export default async function handler(req, res) {
         user: process.env.EMAIL_USER, // Seu e-mail
         pass: process.env.EMAIL_PASS, // Sua senha de e-mail ou App Password (se estiver usando autenticação em duas etapas)
       },
-      tls: {
-    rejectUnauthorized: false, // Ignora a verificação do certificado
-  },
     });
 
     // Verificando a configuração do transporte

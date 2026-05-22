@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 import clientPromise from "../../lib/mongodb";
+import { checkRateLimit, getClientIp } from "../../lib/ratelimit";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -12,8 +13,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "E-mail e obrigatorio." });
   }
 
+  // Limite por email (impede flood sobre uma conta específica)
+  const { allowed: allowedEmail } = await checkRateLimit({
+    key: `sendCode:email:${email.toLowerCase()}`,
+    max: 5,
+    windowMs: 60 * 60 * 1000, // 1 hora
+  });
+  if (!allowedEmail) {
+    return res.status(429).json({ message: "Muitas tentativas para este e-mail. Tente novamente em 1 hora." });
+  }
+
+  // Limite por IP (barreira secundária contra abuso em massa)
+  const ip = getClientIp(req);
+  const { allowed: allowedIp } = await checkRateLimit({
+    key: `sendCode:ip:${ip}`,
+    max: 15,
+    windowMs: 60 * 60 * 1000, // 1 hora
+  });
+  if (!allowedIp) {
+    return res.status(429).json({ message: "Muitas tentativas a partir desta rede. Tente novamente em 1 hora." });
+  }
+
   try {
-    const codigo = crypto.randomBytes(3).toString("hex").toUpperCase(); // 6 chars
+    const codigo = crypto.randomBytes(4).toString("hex").toUpperCase(); // 8 chars ~4B combinações
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
     const createdAt = new Date();
 
@@ -22,10 +44,6 @@ export default async function handler(req, res) {
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
-      },
-      tls: {
-        // evita falha em ambientes com certificado self-signed
-        rejectUnauthorized: false,
       },
     });
 

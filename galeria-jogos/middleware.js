@@ -10,11 +10,22 @@ const PUBLIC_PATHS = [
   /^\/favicon\.ico$/i,
   /^\/auth\/signin$/i,
   /^\/auth\/error$/i,
+  /^\/verificacao/i, // página de verificação (sempre acessível)
+  /^\/cadastro/i,    // cadastro (sempre acessível)
   /^\/imagens\/.*/i,
   /^\/public\/.*/i,
 ];
 
+// Rotas que exigem conta verificada (além de autenticação)
+const VERIFIED_PATHS = [
+  /^\/wallet(\/.*)?$/i,
+  /^\/meus-grupos/i,
+  /^\/assinatura(\/.*)?$/i,
+  /^\/admin(\/.*)?$/i,
+];
+
 const isPublicPath = (pathname = '') => PUBLIC_PATHS.some((regex) => regex.test(pathname));
+const requiresVerified = (pathname = '') => VERIFIED_PATHS.some((regex) => regex.test(pathname));
 
 export async function middleware(req) {
   const { pathname, origin, search } = req.nextUrl;
@@ -26,14 +37,20 @@ export async function middleware(req) {
 
   const secret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
   const token = await getToken({ req, secret });
-  if (token) {
-    return NextResponse.next();
+
+  if (!token) {
+    const callbackUrl = pathname + (search || '');
+    const signinUrl = new URL('/auth/signin', origin);
+    signinUrl.searchParams.set('callbackUrl', callbackUrl || '/');
+    return NextResponse.redirect(signinUrl);
   }
 
-  const callbackUrl = pathname + (search || '');
-  const signinUrl = new URL('/auth/signin', origin);
-  signinUrl.searchParams.set('callbackUrl', callbackUrl || '/');
-  return NextResponse.redirect(signinUrl);
+  // Conta autenticada mas não verificada tentando acessar rota sensível
+  if (!token.contaValidada && requiresVerified(pathname)) {
+    return NextResponse.redirect(new URL('/verificacao', origin));
+  }
+
+  return NextResponse.next();
 }
 
 // Aplica o middleware em todas as rotas (excecoes tratadas em isPublicPath)

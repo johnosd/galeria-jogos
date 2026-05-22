@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import { authOptions } from '../../auth/[...nextauth]';
 import { getDb } from '../../../../lib/mongodb';
 import { PERMISSIONS, hasRole } from '../../../../lib/authz';
+import { decryptCPF } from '../../../../lib/encryption';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
         nome: u.nome || '',
         sobrenome: u.sobrenome || '',
         email: u.email || '',
-        cpf: u.cpf || '',
+        cpf: decryptCPF(u.cpf || ''),
         systemRole: u.systemRole || 'user',
         isBlocked: Boolean(u.isBlocked),
       }))

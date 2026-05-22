@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { MongoClient, ServerApiVersion } from 'mongodb';
+import './env.js';
 
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB;
@@ -18,22 +19,22 @@ const options = {
     strict: true,
     deprecationErrors: true,
   },
+  maxPoolSize: 10,
+  minPoolSize: 1,
+  connectTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
 };
 
-let client;
-let clientPromise;
+// Reutiliza a conexão entre invocações serverless (dev e prod)
+if (!global._mongoClientPromise) {
+  const client = new MongoClient(uri, options);
+  global._mongoClientPromise = client.connect();
+}
 
-if (process.env.NODE_ENV === 'development') {
-  // Reutiliza conexao durante desenvolvimento
-  if (!global._mongoClientPromise) {
-    client = new MongoClient(uri, options);
-    global._mongoClientPromise = client.connect();
-  }
-  clientPromise = global._mongoClientPromise;
-} else {
-  // Producao: cria nova conexao
-  client = new MongoClient(uri, options);
-  clientPromise = client.connect();
+const clientPromise = global._mongoClientPromise;
+
+export async function getClient() {
+  return global._mongoClientPromise;
 }
 
 export async function getDb() {
@@ -97,7 +98,7 @@ export async function insertLedgerEntry({
   status = 'pending',
   description = null,
   createdAt = new Date(),
-}) {
+}, { session } = {}) {
   if (!walletId || !type || !amount || !source) {
     throw new Error('walletId, type, source e amount sao obrigatorios para lancamentos');
   }
@@ -113,7 +114,7 @@ export async function insertLedgerEntry({
     ...(description ? { description } : {}),
     createdAt,
   };
-  await db.collection('walletTransactions').insertOne(ledgerEntry);
+  await db.collection('walletTransactions').insertOne(ledgerEntry, session ? { session } : undefined);
   return ledgerEntry;
 }
 
@@ -125,7 +126,7 @@ export async function insertWithdrawal({
   status = 'requested',
   adminId = null,
   createdAt = new Date(),
-}) {
+}, { session } = {}) {
   if (!userId || !walletId || !pixKeyCpf || !amount) {
     throw new Error('userId, walletId, pixKeyCpf e amount sao obrigatorios para saques');
   }
@@ -140,7 +141,7 @@ export async function insertWithdrawal({
     adminId,
     createdAt,
   };
-  await db.collection('withdrawals').insertOne(withdrawal);
+  await db.collection('withdrawals').insertOne(withdrawal, session ? { session } : undefined);
   return withdrawal;
 }
 

@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]';
-import { getDb, insertLedgerEntry } from '../../../lib/mongodb';
+import { getClient, getDb, insertLedgerEntry } from '../../../lib/mongodb';
 import { INVOICE_STATUS, createInvoice, getInvoiceById, markInvoiceAwaitingTopUp, markInvoicePaid } from '../../../lib/invoices';
 import { calculateBalances, ensureWallet, getSessionUserId, normalizeAmount } from '../../../lib/wallet';
 
@@ -30,6 +30,9 @@ export default async function handler(req, res) {
     const userId = getSessionUserId(session);
     if (!session || !userId) {
       return res.status(401).json({ error: 'Nao autenticado' });
+    }
+    if (!session.user.contaValidada) {
+      return res.status(403).json({ error: 'Conta nao verificada. Confirme seu e-mail para assinar grupos.' });
     }
 
     const grupoIdRaw = String(req.body?.grupoId || '').trim();
@@ -87,25 +90,33 @@ export default async function handler(req, res) {
 
     const balances = await calculateBalances(wallet._id);
     if (balances.available >= amount) {
-      const ledgerEntry = await insertLedgerEntry({
-        walletId: wallet._id,
-        type: 'debit',
-        amount,
-        source: 'assinatura_grupo',
-        referenceId: invoice._id,
-        status: 'confirmed',
-        description: `Assinatura do grupo ${grupo?.nome || grupoIdRaw}`,
-      });
+      const mongoClient = await getClient();
+      const txSession = mongoClient.startSession();
+      let ledgerEntry, updatedInvoice;
+      try {
+        await txSession.withTransaction(async () => {
+          ledgerEntry = await insertLedgerEntry({
+            walletId: wallet._id,
+            type: 'debit',
+            amount,
+            source: 'assinatura_grupo',
+            referenceId: invoice._id,
+            status: 'confirmed',
+            description: `Assinatura do grupo ${grupo?.nome || grupoIdRaw}`,
+          }, { session: txSession });
+
+          updatedInvoice = await markInvoicePaid({
+            invoiceId: invoice._id,
+            walletId: wallet._id,
+            ledgerId: ledgerEntry._id,
+            paidAt: new Date(),
+          }, { session: txSession });
+        });
+      } finally {
+        await txSession.endSession();
+      }
 
       const updatedBalances = await calculateBalances(wallet._id);
-      const updatedInvoice = await markInvoicePaid({
-        invoiceId: invoice._id,
-        walletId: wallet._id,
-        ledgerId: ledgerEntry._id,
-        paidAt: new Date(),
-        balanceSnapshot: updatedBalances,
-      });
-
       return res.status(200).json({
         invoiceId: updatedInvoice?._id || invoice._id,
         status: INVOICE_STATUS.PAGA,

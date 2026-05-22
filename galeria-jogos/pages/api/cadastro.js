@@ -6,16 +6,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Metodo nao permitido." });
   }
 
-  const { nome, sobrenome, email, image, telefone = "", username, systemRole, isBlocked } = req.body || {};
+  const { nome, sobrenome, email, image, telefone = "", username } = req.body || {};
 
   const nomeLimpo = (nome || "").trim();
   const sobrenomeLimpo = (sobrenome || "").trim();
   const emailLimpo = (email || "").trim().toLowerCase();
   const usernameLimpo = (username || "").trim().toLowerCase();
   const telefoneLimpo = String(telefone || "").replace(/\D/g, "");
-  const systemRolesPermitidos = ["user", "support", "finance", "admin"];
-  const systemRoleSanitizado = systemRolesPermitidos.includes(systemRole) ? systemRole : "user";
-  const isBlockedNormalizado = typeof isBlocked === "boolean" ? isBlocked : false;
 
   if (!nomeLimpo || !sobrenomeLimpo || !emailLimpo || !usernameLimpo) {
     return res.status(400).json({ message: "Nome, sobrenome, email e usuario sao obrigatorios." });
@@ -51,8 +48,8 @@ export default async function handler(req, res) {
       telefone: telefoneLimpo,
       username: usernameLimpo,
       contaValidada: false,
-      systemRole: systemRoleSanitizado,
-      isBlocked: isBlockedNormalizado,
+      systemRole: "user",
+      isBlocked: false,
       createdAt: new Date(),
     });
 

@@ -1,7 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]';
-import { insertLedgerEntry, insertWithdrawal } from '../../../lib/mongodb';
+import { getClient, insertLedgerEntry, insertWithdrawal } from '../../../lib/mongodb';
 import { calculateBalances, ensureWallet, getSessionUserId, normalizeAmount } from '../../../lib/wallet';
+import { encryptCPF } from '../../../lib/encryption';
 
 const CPF_REGEX = /^\d{11}$/;
 
@@ -16,6 +17,9 @@ export default async function handler(req, res) {
     const userId = getSessionUserId(session);
     if (!session || !userId) {
       return res.status(401).json({ error: 'Nao autenticado' });
+    }
+    if (!session.user.contaValidada) {
+      return res.status(403).json({ error: 'Conta nao verificada. Confirme seu e-mail para realizar saques.' });
     }
 
     const amount = normalizeAmount(req.body?.amount);
@@ -33,22 +37,31 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Saldo insuficiente para saque' });
     }
 
-    const withdrawal = await insertWithdrawal({
-      userId,
-      walletId: wallet._id,
-      pixKeyCpf: cpfPixKey,
-      amount,
-      status: 'requested',
-    });
+    const mongoClient = await getClient();
+    const txSession = mongoClient.startSession();
+    let withdrawal, ledgerEntry;
+    try {
+      await txSession.withTransaction(async () => {
+        withdrawal = await insertWithdrawal({
+          userId,
+          walletId: wallet._id,
+          pixKeyCpf: encryptCPF(cpfPixKey),
+          amount,
+          status: 'requested',
+        }, { session: txSession });
 
-    const ledgerEntry = await insertLedgerEntry({
-      walletId: wallet._id,
-      type: 'debit',
-      amount,
-      source: 'saque',
-      referenceId: withdrawal._id,
-      status: 'blocked',
-    });
+        ledgerEntry = await insertLedgerEntry({
+          walletId: wallet._id,
+          type: 'debit',
+          amount,
+          source: 'saque',
+          referenceId: withdrawal._id,
+          status: 'blocked',
+        }, { session: txSession });
+      });
+    } finally {
+      await txSession.endSession();
+    }
 
     const updatedBalances = await calculateBalances(wallet._id);
 

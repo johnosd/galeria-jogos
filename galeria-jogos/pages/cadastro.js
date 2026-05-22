@@ -16,7 +16,6 @@ export default function Cadastro() {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
 
   useEffect(() => {
     if (!fullName) return;
@@ -55,7 +54,6 @@ export default function Cadastro() {
 
     setLoading(true);
     setErro("");
-    setSucesso("");
 
     const payload = {
       nome: nome.trim(),
@@ -75,21 +73,7 @@ export default function Cadastro() {
     });
 
     if (response.ok) {
-      setSucesso("Cadastro realizado! Enviando codigo de verificacao...");
-      const verificationResponse = await fetch("/api/sendVerificationCode", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (verificationResponse.ok) {
-        router.push("/verificacao");
-      } else {
-        const verificationData = await verificationResponse.json();
-        setErro(verificationData.message || "Erro ao enviar o codigo de verificacao.");
-      }
+      router.push("/verificacao");
     } else {
       const data = await response.json();
       setErro(data.message || "Erro ao cadastrar.");
@@ -144,7 +128,6 @@ export default function Cadastro() {
         />
 
         {erro && <p className="text-red-500 text-sm mb-2">{erro}</p>}
-        {sucesso && <p className="text-green-600 text-sm mb-2">{sucesso}</p>}
 
         <button
           type="submit"

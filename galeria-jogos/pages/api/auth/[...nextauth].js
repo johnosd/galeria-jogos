@@ -2,6 +2,7 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import clientPromise from "../../../lib/mongodb";
+import { checkRateLimit } from "../../../lib/ratelimit";
 
 const DEFAULT_SESSION_MAX_AGE = 60 * 60 * 24; // 24h
 const DEFAULT_SESSION_UPDATE_AGE = 60 * 30; // 30min
@@ -17,9 +18,29 @@ export const authOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
   ],
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
   callbacks: {
+    async signIn({ user }) {
+      const { allowed } = await checkRateLimit({
+        key: `login:${user.email}`,
+        max: 10,
+        windowMs: 15 * 60 * 1000, // 15 min
+      });
+      return allowed;
+    },
     async jwt({ token, user }) {
       if (user) {
+        // Primeiro login: popula token a partir do banco
         token.email = user.email;
         token.name = user.name;
         token.image = user.image;
@@ -64,6 +85,19 @@ export const authOptions = {
           token.contaValidada = false;
           token.systemRole = "user";
           token.isBlocked = false;
+        }
+      } else if (token.email) {
+        // Refresh do token: atualiza campos voláteis do banco para o middleware funcionar corretamente
+        const client = await clientPromise;
+        const db = client.db(process.env.MONGODB_DB);
+        const usuario = await db.collection("users").findOne(
+          { email: token.email },
+          { projection: { contaValidada: 1, isBlocked: 1, systemRole: 1 } }
+        );
+        if (usuario) {
+          token.contaValidada = usuario.contaValidada || false;
+          token.isBlocked = usuario.isBlocked || false;
+          token.systemRole = usuario.systemRole || token.systemRole || "user";
         }
       }
       return token;

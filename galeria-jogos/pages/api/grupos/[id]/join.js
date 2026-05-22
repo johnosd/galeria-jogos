@@ -28,10 +28,21 @@ export default async function handler(req, res) {
     const membrosCollection = db.collection('membrosGrupo');
 
     if (req.method === 'DELETE') {
+      const deleteSession = await getServerSession(req, res, authOptions);
+      const deleteSessionId = deleteSession?.user?.id || deleteSession?.user?._id || deleteSession?.user?.sub;
+      if (!deleteSession || !deleteSessionId) {
+        return res.status(401).json({ error: 'Nao autenticado' });
+      }
+
       const { userId } = req.body || {};
       const userObjectId = parseObjectId(userId);
       if (!userObjectId) {
         return res.status(400).json({ error: 'userId obrigatorio e deve ser um ObjectId valido' });
+      }
+
+      const isStaffDelete = ['admin', 'support'].includes(deleteSession.user?.systemRole);
+      if (!isStaffDelete && String(deleteSessionId) !== String(userId)) {
+        return res.status(403).json({ error: 'Sem permissao para remover outro membro' });
       }
 
       const membro = await membrosCollection.findOne({ grupoId, userId: userObjectId });
@@ -101,6 +112,9 @@ export default async function handler(req, res) {
 
     if (!session || !userObjectId) {
       return res.status(401).json({ error: 'Nao autenticado' });
+    }
+    if (!session.user.contaValidada) {
+      return res.status(403).json({ error: 'Conta nao verificada. Confirme seu e-mail para entrar em grupos.' });
     }
 
     const invoiceIdRaw = String(req.body?.invoiceId || '').trim();

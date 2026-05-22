@@ -5,6 +5,20 @@ import { useSession } from 'next-auth/react';
 import Header from '../../components/Header';
 import { PERMISSIONS, hasRole } from '../../lib/authz';
 
+const ROLES = [
+  { value: 'user',    label: 'Usuário' },
+  { value: 'support', label: 'Suporte' },
+  { value: 'finance', label: 'Financeiro' },
+  { value: 'admin',   label: 'Admin' },
+];
+
+const ROLE_BADGE = {
+  user:    'bg-gray-100 text-gray-700',
+  support: 'bg-blue-100 text-blue-700',
+  finance: 'bg-yellow-100 text-yellow-700',
+  admin:   'bg-purple-100 text-purple-700',
+};
+
 const TABS = [
   { id: 'users', label: 'Usuarios', roles: PERMISSIONS.USERS_TAB },
   { id: 'groups', label: 'Grupos', roles: PERMISSIONS.GROUPS_TAB },
@@ -12,7 +26,7 @@ const TABS = [
   { id: 'audit', label: 'Auditoria', roles: PERMISSIONS.AUDIT_TAB },
 ];
 
-function UsersTab({ allowed }) {
+function UsersTab({ allowed, canChangeRole, currentUserId }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +52,7 @@ function UsersTab({ allowed }) {
   }, [allowed]);
 
   const toggleBlock = async (id, isBlocked) => {
-    setActionLoading(id);
+    setActionLoading(`block-${id}`);
     setError('');
     try {
       const res = await fetch(`/api/admin/users/${id}/block`, {
@@ -53,6 +67,29 @@ function UsersTab({ allowed }) {
       );
     } catch (err) {
       setError(err.message || 'Erro ao atualizar usuario');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const changeRole = async (id, systemRole) => {
+    setActionLoading(`role-${id}`);
+    setError('');
+    try {
+      const res = await fetch(`/api/admin/users/${id}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Erro ao alterar papel');
+      setItems((prev) =>
+        prev.map((u) => (u._id === id ? { ...u, systemRole: data.systemRole } : u))
+      );
+    } catch (err) {
+      setError(err.message || 'Erro ao alterar papel');
+      // reverte o select visualmente recarregando os itens
+      load();
     } finally {
       setActionLoading('');
     }
@@ -86,32 +123,62 @@ function UsersTab({ allowed }) {
             </tr>
           </thead>
           <tbody>
-            {items.map((u) => (
-              <tr key={u._id} className="border-t">
-                <td className="px-3 py-2">{[u.nome, u.sobrenome].filter(Boolean).join(' ') || '-'}</td>
-                <td className="px-3 py-2">{u.email || '-'}</td>
-                <td className="px-3 py-2">{u.cpf || '-'}</td>
-                <td className="px-3 py-2">{u.systemRole || 'user'}</td>
-                <td className="px-3 py-2">{u.isBlocked ? 'Bloqueado' : 'Ativo'}</td>
-                <td className="px-3 py-2">
-                  <button
-                    onClick={() => toggleBlock(u._id, u.isBlocked)}
-                    disabled={actionLoading === u._id}
-                    className={`px-3 py-1 rounded text-sm font-semibold ${
-                      u.isBlocked
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-red-600 text-white hover:bg-red-700'
-                    } disabled:opacity-50`}
-                  >
-                    {actionLoading === u._id
-                      ? 'Atualizando...'
-                      : u.isBlocked
-                      ? 'Desbloquear'
-                      : 'Bloquear'}
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {items.map((u) => {
+              const isOwnAccount = String(u._id) === String(currentUserId);
+              const roleLoading = actionLoading === `role-${u._id}`;
+              const blockLoading = actionLoading === `block-${u._id}`;
+              return (
+                <tr key={u._id} className="border-t">
+                  <td className="px-3 py-2">{[u.nome, u.sobrenome].filter(Boolean).join(' ') || '-'}</td>
+                  <td className="px-3 py-2">{u.email || '-'}</td>
+                  <td className="px-3 py-2">{u.cpf || '-'}</td>
+                  <td className="px-3 py-2">
+                    {canChangeRole && !isOwnAccount ? (
+                      <select
+                        value={u.systemRole || 'user'}
+                        disabled={roleLoading}
+                        onChange={(e) => changeRole(u._id, e.target.value)}
+                        className={`text-xs font-semibold rounded px-2 py-1 border border-gray-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50 ${ROLE_BADGE[u.systemRole] || ROLE_BADGE.user}`}
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className={`text-xs font-semibold rounded px-2 py-1 ${ROLE_BADGE[u.systemRole] || ROLE_BADGE.user}`}>
+                        {ROLES.find((r) => r.value === u.systemRole)?.label || u.systemRole || 'Usuário'}
+                        {isOwnAccount && <span className="ml-1 text-gray-400">(você)</span>}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`text-xs font-semibold rounded px-2 py-1 ${u.isBlocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                      {u.isBlocked ? 'Bloqueado' : 'Ativo'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => toggleBlock(u._id, u.isBlocked)}
+                      disabled={blockLoading || isOwnAccount}
+                      title={isOwnAccount ? 'Voce nao pode bloquear a propria conta' : ''}
+                      className={`px-3 py-1 rounded text-sm font-semibold ${
+                        u.isBlocked
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-red-600 text-white hover:bg-red-700'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {blockLoading
+                        ? 'Atualizando...'
+                        : u.isBlocked
+                        ? 'Desbloquear'
+                        : 'Bloquear'}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
             {items.length === 0 && (
               <tr>
                 <td className="px-3 py-4 text-gray-600" colSpan={6}>
@@ -237,7 +304,13 @@ export default function AdminPanel() {
   const renderTab = () => {
     switch (currentTab) {
       case 'users':
-        return <UsersTab allowed={isAllowed(PERMISSIONS.USERS_TAB)} />;
+        return (
+          <UsersTab
+            allowed={isAllowed(PERMISSIONS.USERS_TAB)}
+            canChangeRole={isAllowed(PERMISSIONS.ROLE_CHANGE)}
+            currentUserId={session?.user?.id}
+          />
+        );
       case 'groups':
         return <GroupsTab allowed={isAllowed(PERMISSIONS.GROUPS_TAB)} />;
       case 'withdrawals':

@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import clientPromise from '../../../../lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]';
+import { isValidEmail } from '../../../../lib/validation';
 
 const MAX_LEN = 1000;
 
@@ -18,9 +19,6 @@ const buildTransporter = () =>
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false,
     },
   });
 
@@ -92,7 +90,7 @@ export default async function handler(req, res) {
 
     const destinatarios = membrosAtivos
       .map((m) => m.email)
-      .filter((email) => typeof email === 'string' && /\S+@\S+\.\S+/.test(email));
+      .filter((email) => isValidEmail(email));
 
     if (!destinatarios.length) {
       return res.status(400).json({ error: 'Nenhum destinatario ativo com email valido' });
